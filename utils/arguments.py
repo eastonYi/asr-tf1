@@ -72,7 +72,7 @@ if args.dirs.type == 'scp':
         _shuffle=False,
         transform=True)
 elif args.dirs.type == 'csv':
-    from dataProcessing.dataHelper import ASR_csv_DataSet
+    from .dataset import ASR_csv_DataSet
     dataset_train = ASR_csv_DataSet(
         list_files=args.dirs.train.list_files,
         args=args,
@@ -88,6 +88,23 @@ elif args.dirs.type == 'csv':
         args=args,
         _shuffle=False,
         transform=True)
+elif args.dirs.type == 'scp_classify':
+    from .dataset import ASR_classify_ArkDataSet
+    dataset_train = ASR_classify_ArkDataSet(
+        scp_file=args.dirs.train.scp,
+        class_file=args.dirs.train.label,
+        args=args,
+        _shuffle=True)
+    dataset_dev = ASR_classify_ArkDataSet(
+        scp_file=args.dirs.dev.scp,
+        class_file=args.dirs.dev.label,
+        args=args,
+        _shuffle=False)
+    dataset_test = ASR_classify_ArkDataSet(
+        scp_file=args.dirs.test.scp,
+        class_file=args.dirs.test.label,
+        args=args,
+        _shuffle=False)
 else:
     raise NotImplementedError('not dataset structure!')
 args.dataset_dev = dataset_dev
@@ -110,6 +127,8 @@ if args.model.encoder.structure == 'transformer_encoder':
     from models.encoders.transformer_encoder import Transformer_Encoder as encoder
 elif args.model.encoder.structure == 'conv_lstm':
     from models.encoders.conv_lstm import CONV_LSTM as encoder
+elif args.model.encoder.structure == 'classifier':
+    from models.encoders.classifier import CONV_LSTM_Classifier as encoder
 elif args.model.encoder.structure == 'BLSTM':
     from models.encoders.blstm import BLSTM as encoder
 else:
@@ -118,14 +137,11 @@ args.model.encoder.structure = encoder
 
 ## decoder
 
-if args.model.decoder.structure == 'FC':
-    from models.decoders.fc_decoder import FCDecoder as decoder
-elif args.model.decoder.structure == 'transformer_decoder':
-    from models.decoders.transformer_decoder import Transformer_Decoder as decoder
-args.model.decoder.structure = decoder
 try:
     if args.model.decoder.structure == 'FC':
         from models.decoders.fc_decoder import FCDecoder as decoder
+    elif args.model.decoder.structure == 'classifier':
+        from models.decoders.classifier import FCDecoder as decoder
     elif args.model.decoder.structure == 'transformer_decoder':
         from models.decoders.transformer_decoder import Transformer_Decoder as decoder
     args.model.decoder.structure = decoder
@@ -140,6 +156,8 @@ if args.model.structure == 'Seq2SeqModel':
     from models.seq2seqModel import Seq2SeqModel as Model
 elif args.model.structure == 'ctcModel':
     from models.ctcModel import CTCModel as Model
+elif args.model.structure == 'classifier':
+    from models.classifier import Classifier as Model
 elif args.model.structure == 'transformer':
     from models.Transformer import Transformer as Model
 else:

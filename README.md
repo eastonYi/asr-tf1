@@ -1,7 +1,7 @@
 # Unsupervised phone classification
 
 ## Environments
-- Tensorflow == 2.0.0.beta
+- Tensorflow == 1.14
 - Python == 3.7
 
 ## Exps

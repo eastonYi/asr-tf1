@@ -3,22 +3,16 @@ import logging
 import sys
 
 from .utils.regularization import confidence_penalty
-from .utils.tools import dense_sequence_to_sparse, choose_device
+from .utils.tools import dense_sequence_to_sparse, choose_device, get_tensor_len
 from .seq2seqModel import Seq2SeqModel
 
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format='%(levelname)s(%(filename)s:%(lineno)d): %(message)s')
 
 
-class CTCModel(Seq2SeqModel):
+class Classifier(Seq2SeqModel):
     '''
     CTC model is viewed as seq2seq model with the final FC layer as decoder.
     '''
-    def __init__(self, tensor_global_step, encoder, decoder, training, args,
-                 batch=None, embed_table_encoder=None, embed_table_decoder=None,
-                 name='CTC_Model'):
-        self.sample_prob = tf.convert_to_tensor(0.0)
-        super().__init__(tensor_global_step, encoder, decoder, training, args,
-                     batch, None, None, name)
 
     def build_single_graph(self, id_gpu, name_gpu, tensors_input):
         tf.get_variable_scope().set_initializer(tf.variance_scaling_initializer(
@@ -41,11 +35,11 @@ class CTCModel(Seq2SeqModel):
             logits, preds, len_decoded = decoder(encoded, len_encoded)
 
             if self.training:
-                loss = self.ctc_loss(
+                loss = self.CE_loss(
                     logits=logits,
                     len_logits=len_decoded,
                     labels=tensors_input.label_splits[id_gpu],
-                    len_labels=tensors_input.len_label_splits[id_gpu])
+                    vocab_size=self.args.dim_output)
 
                 if self.args.model.confidence_penalty:
                     cp_loss = self.args.model.decoder.confidence_penalty * confidence_penalty(logits, len_decoded)
@@ -66,23 +60,26 @@ class CTCModel(Seq2SeqModel):
         else:
             return logits, len_decoded
 
-    def ctc_loss(self, logits, len_logits, labels, len_labels):
-        """
-        No valid path found: It is possible that no valid path is found if the
-        activations for the targets are zero.
-        """
-        labels_sparse = dense_sequence_to_sparse(
-            labels,
-            len_labels)
-        ctc_loss = tf.nn.ctc_loss(
-            labels_sparse,
-            logits,
-            sequence_length=len_logits,
-            ctc_merge_repeated=True,
-            ignore_longer_outputs_than_inputs=True,
-            time_major=False)
+    def CE_loss(self, logits, len_logits, labels, vocab_size, confidence=0.9):
+        labels = tf.tile(labels[:, 0][:, None], [1, tf.shape(logits)[1]])
 
-        return ctc_loss
+        low_confidence = (1.0 - confidence) / tf.cast(vocab_size-1, tf.float32)
+        normalizing = -(confidence*tf.math.log(confidence) +
+            tf.cast(vocab_size-1, tf.float32) * low_confidence * tf.math.log(low_confidence + 1e-20))
+        soft_targets = tf.one_hot(
+            tf.cast(labels, tf.int32),
+            depth=vocab_size,
+            on_value=confidence,
+            off_value=low_confidence)
+
+        xentropy = tf.nn.softmax_cross_entropy_with_logits_v2(
+            logits=logits, labels=soft_targets)
+        loss = xentropy - normalizing
+
+        gen_loss = tf.sequence_mask(len_logits, dtype=tf.float32) * loss
+        loss = tf.reduce_sum(gen_loss, -1) / tf.cast(len_logits, tf.float32)
+
+        return loss
 
     def build_infer_graph(self):
         # cerate input tensors in the cpu
@@ -92,32 +89,6 @@ class CTCModel(Seq2SeqModel):
                 id_gpu=0,
                 name_gpu=self.list_gpu_devices[0],
                 tensors_input=tensors_input)
+            _y = tf.argmax(tf.math.bincount(tf.argmax(logits, -1, output_type=tf.int32)))
 
-            decoded_sparse = self.ctc_decode(logits, len_logits)
-            decoded = tf.sparse_to_dense(
-                sparse_indices=decoded_sparse.indices,
-                output_shape=decoded_sparse.dense_shape,
-                sparse_values=decoded_sparse.values,
-                default_value=0,
-                validate_indices=True)
-            distribution = tf.nn.softmax(logits)
-
-        return decoded, tensors_input.shape_batch, distribution
-
-    def ctc_decode(self, logits, len_logits):
-        beam_size = self.args.beam_size
-        logits_timeMajor = tf.transpose(logits, [1, 0, 2])
-
-        if beam_size == 1:
-            decoded_sparse = tf.to_int32(tf.nn.ctc_greedy_decoder(
-                logits_timeMajor,
-                len_logits,
-                merge_repeated=True)[0][0])
-        else:
-            decoded_sparse = tf.to_int32(tf.nn.ctc_beam_search_decoder(
-                logits_timeMajor,
-                len_logits,
-                beam_width=beam_size,
-                merge_repeated=True)[0][0])
-
-        return decoded_sparse
+        return _y, tensors_input.shape_batch, tf.nn.softmax(logits)

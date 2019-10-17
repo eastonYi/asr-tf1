@@ -5,7 +5,7 @@ from ..utils.blocks import conv_lstm
 from ..utils.attention import residual, layer_norm
 
 
-class CONV_LSTM(Encoder):
+class CONV_LSTM_Classifier(Encoder):
     '''VERY DEEP CONVOLUTIONAL NETWORKS FOR END-TO-END SPEECH RECOGNITION
     '''
 
@@ -20,9 +20,8 @@ class CONV_LSTM(Encoder):
         # x = tf.expand_dims(features, -1)
         size_batch  = tf.shape(features)[0]
         size_length = tf.shape(features)[1]
-        size_feat = int(size_feat/3)
         len_feats = tf.reduce_sum(tf.cast(tf.reduce_sum(tf.abs(features), -1) > 0, tf.int32), -1)
-        x = tf.reshape(features, [size_batch, size_length, size_feat, 3])
+        x = tf.reshape(features, [size_batch, size_length, size_feat, 1])
         # the first cnn layer
         x = self.normal_conv(
             inputs=x,
@@ -46,41 +45,15 @@ class CONV_LSTM(Encoder):
 
         outputs = x
 
-        outputs = self.blstm(
-            hidden_output=outputs,
-            len_feas=len_seq,
-            num_hidden=num_hidden,
-            use_residual=use_residual,
-            dropout=dropout,
-            name='blstm_1')
-        outputs, len_seq = self.pooling(outputs, len_seq, 'HALF', 1)
-
-        outputs = self.blstm(
-            hidden_output=outputs,
-            len_feas=len_seq,
-            num_hidden=num_hidden,
-            use_residual=use_residual,
-            dropout=dropout,
-            name='blstm_2')
-        outputs, len_seq = self.pooling(outputs, len_seq, 'SAME', 2)
-
-        outputs = self.blstm(
-            hidden_output=outputs,
-            len_feas=len_seq,
-            num_hidden=num_hidden,
-            use_residual=use_residual,
-            dropout=dropout,
-            name='blstm_3')
-        outputs, len_seq = self.pooling(outputs, len_seq, 'HALF', 3)
-
-        outputs = self.blstm(
-            hidden_output=outputs,
-            len_feas=len_seq,
-            num_hidden=num_hidden,
-            use_residual=use_residual,
-            dropout=dropout,
-            name='blstm_4')
-        outputs, len_seq = self.pooling(outputs, len_seq, 'SAME', 4)
+        for i in range(4):
+            outputs = self.blstm(
+                hidden_output=outputs,
+                len_feas=len_seq,
+                num_hidden=num_hidden,
+                use_residual=use_residual,
+                dropout=dropout,
+                name='blstm_'+str(i))
+            outputs, len_seq = self.pooling(outputs, len_seq, 'HALF', 1)
 
         pad_mask = tf.tile(tf.expand_dims(tf.sequence_mask(len_seq, tf.shape(outputs)[1], tf.float32), -1),
                            [1, 1, num_hidden])

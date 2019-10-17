@@ -56,7 +56,7 @@ def save2tfrecord(dataset, dir_save, size_file=5000000):
             fw.write(line + '\n')
 
     with open(dir_save/'tfdata.info', 'w') as fw:
-        print('data_file {}'.format(dataset.list_files), file=fw)
+        # print('data_file {}'.format(dataset.list_files), file=fw)
         print('dim_feature {}'.format(dim_feature), file=fw)
         print('num_tokens {}'.format(num_token), file=fw)
         print('size_dataset {}'.format(i-num_damaged_sample), file=fw)
@@ -134,7 +134,6 @@ def readTFRecord(dir_data, args, _shuffle=False, transform=False):
                          [-1, args.data.dim_feature])[:3000, :]
     # id = tf.decode_raw(features['id'], tf.string)
     label = tf.decode_raw(features['label'], tf.int32)
-
     if transform:
         feature = process_raw_feature(feature, args)
 
@@ -267,7 +266,6 @@ class TFReader:
         seq_len_label = tf.reshape(list_outputs[3], [-1])
 
         return list_outputs[0], list_outputs[1], seq_len_feats, seq_len_label
-
 
     def fentch_batch_bucket(self):
         """

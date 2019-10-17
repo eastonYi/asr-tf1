@@ -6,7 +6,7 @@ from random import shuffle
 from pathlib import Path
 from abc import ABCMeta, abstractmethod
 
-from .dataProcess import audio2vector, process_raw_feature
+from .dataProcess import audio2vector, process_raw_feature, down_sample, splice
 from .tools import align2stamp, align2bound, size_bucket_to_put
 
 logging.basicConfig(level=logging.DEBUG,format='%(levelname)s(%(filename)s:%(lineno)d): %(message)s')
@@ -107,22 +107,23 @@ class ASR_scp_DataSet(ASRDataSet):
         self.list_files = [f_scp]
         super().__init__(self.list_files, args, _shuffle, transform)
         self.reader = ArkReader(f_scp)
-        self.id2trans = self.gen_id2trans(f_trans)
+        self.dict_trans = self.load_trans(f_trans)
+        self.list_uttids = list(self.dict_trans.keys())
 
     def __getitem__(self, idx):
         sample = {}
 
         try:
-            sample['feature'] = self.reader.read_utt_data(idx)
+            sample['uttid'] = uttid = self.list_uttids[idx]
+            sample['feature'] = self.reader.read_utt_data(uttid)
             if self.transform:
                 sample['feature'] = process_raw_feature(sample['feature'], self.args)
 
-            trans = self.id2trans[self.reader.utt_ids[idx]]
+            trans = self.dict_trans[uttid]
             sample['label'] = np.array(
                 [self.token2idx.get(token, self.token2idx['<unk>'])
                 for token in trans] + self.end_id,
                 dtype=np.int32)
-            sample['uttid'] = self.reader.utt_ids[idx]
         except:
             print('Not found {}!'.format(self.reader.utt_ids[idx]))
             sample = None
@@ -130,18 +131,18 @@ class ASR_scp_DataSet(ASRDataSet):
         return sample
 
     def __len__(self):
-        return len(self.reader.utt_ids)
+        return len(self.list_uttids)
 
-    def gen_id2trans(self, f_trans):
-        id2trans = {}
+    def load_trans(self, f_trans):
+        dict_trans = {}
         with open(f_trans, encoding='utf8') as f:
             for line in f:
                 line = line.strip().split()
-                id = line[0]
+                uttid = line[0]
                 trans = line[1:]
-                id2trans[id] = trans
+                dict_trans[uttid] = trans
 
-        return id2trans
+        return dict_trans
 
 
 class ASR_align_DataSet(ASRDataSet):
@@ -512,16 +513,19 @@ class ASR_classify_ArkDataSet(ASRDataSet):
         self.reader = ArkReader(scp_file)
         self.dict_y, self.dict_class = self.load_y(class_file)
         self.list_uttids = list(self.dict_y.keys())
+        if _shuffle:
+            shuffle(self.list_uttids)
 
     def __getitem__(self, id):
         uttid = self.list_uttids[id]
         feat = self.reader.read_utt_data(id)
-        feat = feat[::3, :]
+        # feat = feat[::3, :]
+        feat = down_sample(splice(feat, 2, 0), 3)
         y = self.dict_y[uttid]
 
         sample = {'uttid': uttid,
                   'feature': feat,
-                  'class': y}
+                  'label': y}
 
         return sample
 
@@ -532,20 +536,10 @@ class ASR_classify_ArkDataSet(ASRDataSet):
             for line in f:
                 uttid, y = line.strip().split()
                 if y not in dict_class.keys():
-                    dict_class[y] = len(dict_class)
+                    dict_class[y] = np.array(len(dict_class))
                 dict_y[uttid] = dict_class[y]
 
         return dict_y, dict_class
-
-    def get_y(self, uttids):
-        list_y = []
-        for uttid in uttids:
-            if type(uttid) == bytes:
-                uttid = uttid.decode('utf-8')
-            y = self.dict_y[uttid]
-            list_y.append(y)
-
-        return np.array(list_y, np.int32)
 
     def __len__(self):
         return len(self.list_uttids)

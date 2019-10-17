@@ -5,6 +5,7 @@ import tensorflow as tf
 from .decoder import Decoder
 from ..utils.tools import get_tensor_len
 
+
 class FCDecoder(Decoder):
     '''a fully connected decoder for the CTC architecture'''
 

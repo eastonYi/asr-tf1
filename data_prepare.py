@@ -2,7 +2,7 @@
 # coding=utf-8
 import time
 from utils.arguments import args
-from utils.tfTools.tfData import save2tfrecord, readTFRecord
+from models.utils.tfData import save2tfrecord, readTFRecord
 from utils.tools import get_bucket
 
 
@@ -11,11 +11,11 @@ def main():
     # if confirm == "":
     #     print('will generate tfdata in 5 secs!')
     #     time.sleep(5)
-    # save2tfrecord(args.dataset_dev, args.dirs.dev.tfdata)
-    # save2tfrecord(args.dataset_train, args.dirs.train.tfdata)
+    save2tfrecord(args.dataset_dev, args.dirs.dev.tfdata)
+    save2tfrecord(args.dataset_train, args.dirs.train.tfdata, size_file=10000000)
     # print(args.data.dim_feature)
     # feat, label = readTFRecord(args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
-    get_bucket(args.dirs.train.tfdata / 'feature_length.txt', args.num_batch_tokens, 150)
+    # get_bucket(args.dirs.train.tfdata / 'feature_length.txt', args.num_batch_tokens, 999)
 
 
 if __name__ == '__main__':

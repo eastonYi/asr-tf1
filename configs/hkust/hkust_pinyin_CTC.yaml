@@ -2,18 +2,18 @@ dirs:
     exp: hksut
     train:
         scp: /mnt/lustre/xushuang2/easton/data/hkust/feats_3x.scp
-        trans: /mnt/lustre/xushuang2/easton/data/hkust/char.train_3x.scp
-        tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/train
+        trans: /mnt/lustre/xushuang2/easton/data/hkust/pinyin.train_3x.scp
+        tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/train_pinyin_xy
     dev:
         scp: /mnt/lustre/xushuang2/easton/data/hkust/feats.dev.scp
-        trans: /mnt/lustre/xushuang2/easton/data/hkust/char.dev.scp
-        tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/dev
+        trans: /mnt/lustre/xushuang2/easton/data/hkust/pinyin.dev.scp
+        tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/dev_pinyin_xy
     test:
         scp: /mnt/lustre/xushuang2/easton/data/hkust/feats.dev.scp
-        trans: /mnt/lustre/xushuang2/easton/data/hkust/char.dev.scp
+        trans: /mnt/lustre/xushuang2/easton/data/hkust/pinyin.dev.scp
     type: scp
-    vocab: /mnt/lustre/xushuang2/easton/data/hkust/char_3673+1.vocab
-    # checkpoint: /data/sxu/easton/projects/EODM/exps/hksut/hkust_CTC/checkpoint
+    vocab: /mnt/lustre/xushuang2/easton/data/hkust/pinyin_1385+1.vocab
+    # checkpoint: /mnt/lustre/xushuang2/easton/projects/EODM/exps/hksut/hkust_CTC/checkpoint
 
 data:
     featType: mfcc
@@ -46,7 +46,7 @@ warmup_steps: 6000
 peak: 0.0002
 decay_steps: 8000
 
-gpus: '0,1,2,3'
+gpus: '5,6,7'
 batch_size: 60
 beam_size: 1
 num_supervised:

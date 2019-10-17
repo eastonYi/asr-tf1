@@ -176,19 +176,17 @@ class ArkReader(object):
 
         self.scp_position = 0
         fin = open(scp_path, "r", errors='ignore')
-        self.utt_ids = []
-        self.scp_data = []
+        self.dict_scp = {}
         line = fin.readline()
         while line != '' and line != None:
-            utt_id, path_pos = line.replace('\n', '').split(' ')
+            uttid, path_pos = line.replace('\n', '').split(' ')
             path, pos = path_pos.split(':')
-            self.utt_ids.append(utt_id)
-            self.scp_data.append((path, pos))
+            self.dict_scp[uttid] = (path, pos)
             line = fin.readline()
 
         fin.close()
 
-    def read_utt_data(self, index):
+    def read_utt_data(self, uttid):
         '''
         read data from the archive
 
@@ -198,9 +196,8 @@ class ArkReader(object):
         Returns:
             a numpy array containing the data from the utterance
         '''
-
-        ark_read_buffer = open(self.scp_data[index][0], 'rb')
-        ark_read_buffer.seek(int(self.scp_data[index][1]), 0)
+        ark_read_buffer = open(self.dict_scp[uttid][0], 'rb')
+        ark_read_buffer.seek(int(self.dict_scp[uttid][1]), 0)
         header = unpack('<xcccc', ark_read_buffer.read(5))
         if header[0] != b"B":
             print("Input .ark file is not binary")
@@ -246,23 +243,6 @@ class ArkReader(object):
         ark_read_buffer.close()
 
         return utt_mat
-
-
-    def read_utt(self, utt_id):
-        '''
-        read the data of a certain utterance ID
-
-        Returns:
-            the utterance data corresponding to the ID
-        '''
-
-        return self.read_utt_data(self.utt_ids.index(utt_id))
-
-    def split(self):
-        '''Split of the data that was read so far'''
-
-        self.scp_data = self.scp_data[self.scp_position:-1]
-        self.utt_ids = self.utt_ids[self.scp_position:-1]
 
 
 class AttrDict(dict):
