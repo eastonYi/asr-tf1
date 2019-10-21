@@ -2,11 +2,9 @@ import tensorflow as tf
 import logging
 import sys
 from collections import namedtuple
-from tensorflow.contrib.layers import fully_connected
 
 from .utils.gradientTools import average_gradients, handle_gradients
-from .utils.tools import warmup_exponential_decay, choose_device, lr_decay_with_warmup, \
-    stepped_down_decay, exponential_decay
+from .utils.tools import warmup_exponential_decay, choose_device, exponential_decay
 from .encoders.blstm import BLSTM
 
 
@@ -32,6 +30,7 @@ class LSTM_Model(object):
 
         # Build graph
         self.list_run = list(self.build_graph() if training else self.build_infer_graph())
+        self.trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
 
     def build_graph(self):
         # cerate input tensors in the cpu
@@ -46,10 +45,8 @@ class LSTM_Model(object):
         loss_step = []
         tower_grads = []
         list_debug = []
-        # the outer scope is necessary for the where the reuse scope need to be limited whthin
-        # or reuse=tf.get_variable_scope().reuse
+
         for id_gpu, name_gpu in enumerate(self.list_gpu_devices):
-            # with tf.variable_scope(self.name, reuse=bool(self.__class__.num_Model)):
             with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
                 loss, gradients, debug = self.build_single_graph(id_gpu, name_gpu, tensors_input)
                 loss_step.append(loss)
@@ -63,11 +60,11 @@ class LSTM_Model(object):
             # computation relevant to gradient
             averaged_grads = average_gradients(tower_grads)
             handled_grads = handle_gradients(averaged_grads, self.args)
-            # with tf.variable_scope('adam', reuse=False):
             op_optimize = self.optimizer.apply_gradients(handled_grads, self.global_step)
 
         self.__class__.num_Instances += 1
-        logging.info("built {} {} instance(s).".format(self.__class__.num_Instances, self.__class__.__name__))
+        logging.info("built {} {} instance(s).".format(
+            self.__class__.num_Instances, self.__class__.__name__))
 
         # return loss, tensors_input.shape_batch, op_optimize
         return loss, tensors_input.shape_batch, op_optimize, [x for x in zip(*list_debug)]
@@ -81,16 +78,13 @@ class LSTM_Model(object):
         # cerate input tensors in the cpu
         tensors_input = self.build_input()
 
-        # the outer scope is necessary for the where the reuse scope need to be limited whthin
-        # or reuse=tf.get_variable_scope().reuse
-        # with tf.variable_scope(self.name, reuse=bool(self.__class__.num_Model)):
         with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
             loss, logits = self.build_single_graph(
                 id_gpu=0,
                 name_gpu=self.list_gpu_devices[0],
                 tensors_input=tensors_input)
 
-        # TODO havn't checked
+        # TODO: havn't checked
         infer = tf.nn.in_top_k(logits, tf.reshape(tensors_input.label_splits[0], [-1]), 1)
 
         return loss, tensors_input.shape_batch, infer
@@ -168,10 +162,10 @@ class LSTM_Model(object):
         with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
             blstm = BLSTM(args=self.args, training=self.training, name=name_gpu)
             hidden_output = blstm(hidden_output)
-            logits = fully_connected(inputs=hidden_output,
-                                     num_outputs=self.args.dim_output,
-                                     activation_fn=tf.identity,
-                                     scope='fully_connected')
+            logits = tf.layers.dense(inputs=hidden_output,
+                                     units=self.args.dim_output,
+                                     activation=tf.identity,
+                                     name='fully_connected')
 
             # Accuracy
             with tf.name_scope("label_accuracy"):
@@ -189,7 +183,8 @@ class LSTM_Model(object):
 
             if self.training:
                 with tf.name_scope("gradients"):
-                    gradients = self.optimizer.compute_gradients(loss)
+                    gradients = self.optimizer.compute_gradients(
+                        loss, var_list=self.trainable_variables)
 
         logging.info('\tbuild {} on {} succesfully! total model number: {}'.format(
             self.__class__.__name__, name_gpu, self.__class__.num_Instances))
@@ -197,19 +192,8 @@ class LSTM_Model(object):
         return loss, gradients if self.training else logits
 
     def build_optimizer(self):
-        if self.args.lr_type == 'stepped_down_decay':
-            self.learning_rate = stepped_down_decay(
-                self.global_step,
-                learning_rate=self.args.learning_rate,
-                decay_rate=self.args.decay_rate,
-                decay_steps=self.args.decay_steps)
-        elif self.args.lr_type == 'lr_decay_with_warmup':
-            self.learning_rate = lr_decay_with_warmup(
-                self.global_step,
-                warmup_steps=self.args.warmup_steps,
-                hidden_units=self.args.model.encoder.num_cell_units)
-        elif self.args.lr_type == 'constant_learning_rate':
-            self.learning_rate = tf.convert_to_tensor(self.args.constant_learning_rate)
+        if self.args.lr_type == 'constant_learning_rate':
+            self.learning_rate = tf.convert_to_tensor(self.args.lr)
         elif self.args.lr_type == 'exponential_decay':
             self.learning_rate = exponential_decay(
                 self.global_step,
@@ -258,6 +242,16 @@ class LSTM_Model(object):
 
         return variables
 
+    def trainable_variables(self, scope=None):
+        '''get a list of the models's variables'''
+        scope = scope if scope else self.name
+        scope += '/'
+        print('all the variables in the scope:', scope)
+        variables = tf.get_collection(
+            tf.GraphKeys.TRAINABLE_VARIABLES,
+            scope=scope)
+
+        return variables
 
 if __name__ == '__main__':
     LSTM_Model()

@@ -14,11 +14,8 @@ class CTCModel(Seq2SeqModel):
     CTC model is viewed as seq2seq model with the final FC layer as decoder.
     '''
     def __init__(self, tensor_global_step, encoder, decoder, training, args,
-                 batch=None, embed_table_encoder=None, embed_table_decoder=None,
-                 name='CTC_Model'):
-        self.sample_prob = tf.convert_to_tensor(0.0)
-        super().__init__(tensor_global_step, encoder, decoder, training, args,
-                     batch, None, None, name)
+                 batch=None, name='CTC_Model'):
+        super().__init__(tensor_global_step, encoder, decoder, training, args, batch, name)
 
     def build_single_graph(self, id_gpu, name_gpu, tensors_input):
         tf.get_variable_scope().set_initializer(tf.variance_scaling_initializer(

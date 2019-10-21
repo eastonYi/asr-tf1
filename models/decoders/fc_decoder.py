@@ -3,12 +3,11 @@ contains the general recurrent decoder class'''
 
 import tensorflow as tf
 from .decoder import Decoder
-from ..utils.tools import get_tensor_len
 
 class FCDecoder(Decoder):
     '''a fully connected decoder for the CTC architecture'''
 
-    def decode(self, encoded, len_encoded):
+    def decode(self, encoded, len_encoded, decoder_input, training):
         dim_output = self.args.dim_output
         logits = tf.layers.dense(
             inputs=encoded,

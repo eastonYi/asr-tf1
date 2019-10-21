@@ -211,3 +211,39 @@ def conv_internal(conv_fn, inputs, filters, kernel_size, **kwargs):
 
 def conv(inputs, filters, kernel_size, **kwargs):
   return conv_internal(tf.layers.conv2d, inputs, filters, kernel_size, **kwargs)
+
+
+def dense_without_vars(inputs,
+                       units,
+                       activation=tf.identity,
+                       use_bias=True,
+                       kernel=None,
+                       reuse=None,
+                       name=None):
+    argcount = activation.__code__.co_argcount
+    if activation.__defaults__:
+        argcount -= len(activation.__defaults__)
+    assert argcount in (0, 1, 2)
+    with tf.variable_scope(name, "dense", reuse=reuse):
+        if argcount <= 1:
+            input_size = inputs.get_shape().as_list()[-1]
+            inputs_shape = tf.unstack(tf.shape(inputs))
+            inputs = tf.reshape(inputs, [-1, input_size])
+            if kernel is not None:
+                assert kernel.get_shape().as_list()[0] == units
+                w = kernel
+            else:
+                with tf.variable_scope(tf.get_variable_scope()):
+                    w = tf.get_variable("kernel", [units, input_size])
+            outputs = tf.matmul(inputs, w, transpose_b=True)
+            if use_bias:
+                b = tf.get_variable("bias", [units], initializer=tf.zeros_initializer)
+                outputs += b
+            outputs = activation(outputs)
+            
+            return tf.reshape(outputs, inputs_shape[:-1] + [units])
+        else:
+            arg1 = dense_without_vars(inputs, units, tf.identity, use_bias, name='arg1')
+            arg2 = dense_without_vars(inputs, units, tf.identity, use_bias, name='arg2')
+
+            return activation(arg1, arg2)

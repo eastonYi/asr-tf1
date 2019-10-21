@@ -3,37 +3,46 @@ dirs:
     train:
         scp: /mnt/lustre/xushuang2/easton/data/libriSpeech/feats/feats.train-960.scp
         trans: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/train-100.trans
-        tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/train-100_xy
+        tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/train-100_xy_eos
     dev:
         scp: /mnt/lustre/xushuang2/easton/data/libriSpeech/feats/feats.dev-clean.scp
         trans: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/dev-clean.trans
-        tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/dev-clean_xy
+        tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/dev-clean_xy_eos
     test:
         scp: /mnt/lustre/xushuang2/easton/data/libriSpeech/feats/feats.test-clean.scp
         trans: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/test-clean.trans
-        tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/test-clean_xy
+        tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/test-clean_xy_eos
     type: scp
-    vocab: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/subword_3724+1.vocab
-    checkpoint_init: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_ctc/checkpoint
+    vocab: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/subword_3726.vocab
+    # checkpoint: /mnt/lustre/xushuang2/easton/projects/EODM/exps/hksut/hkust_char_CTC/test1/checkpoint
 
 data:
     featType: mfcc
-    left_context: 0
+    left_context: 2
     right_context: 0
-    downsample: 1
+    downsample: 3
     add_delta: False
     unit: subword
 
 model:
-    structure: ctcModel
+    type: transformer
     encoder:
-        structure: conv_lstm
-        num_hidden: 1600
-        num_filters: 64
-        dropout: 0.9
+        type: transformer_encoder
+        num_blocks: 6
+        num_heads: 8
+        num_cell_units: 512
+        attention_dropout_rate: 0.1
+        residual_dropout_rate: 0.1
     decoder:
-        structure: FC
-        # size_embedding: 512
+        type: transformer_decoder
+        size_embedding: 512
+        num_blocks: 6
+        num_heads: 8
+        num_cell_units: 512
+        attention_dropout_rate: 0.1
+        residual_dropout_rate: 0.1
+        init_scale: 0.04
+        label_smoothing: 0.9
 
 optimizer: adam
 warmup_steps: 6000
@@ -46,13 +55,15 @@ save_step: 600
 num_epochs: 999
 
 gpus: '4,5,6,7'
-# gpus: '0'
+# gpus: '4'
 batch_size: 60
 beam_size: 1
-num_batch_tokens: 40000
+max_len: 30
+num_batch_tokens: 16000
 bucket_boundaries: 689,995,1165,1253,1309,1352,1387,1417,1444,1467,1488,1510,1530,1551,1572,1595,1641,2451
 
 lambda_l2: 0.0
+lambda_lm: 0.0
 grad_clip_value: 0.0
 slot_clip_value: 0.0
 grad_clip_norm: 0.0

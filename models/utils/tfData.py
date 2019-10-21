@@ -225,8 +225,8 @@ def fentch_filelist(dir_data):
 
 
 class TFReader:
-    def __init__(self, dir_tfdata, args, is_train=True):
-        self.is_train = is_train
+    def __init__(self, dir_tfdata, args, training=True, transform=True):
+        self.training = training
         self.args = args
         self.sess = None
         self.list_batch_size = self.args.list_batch_size
@@ -235,14 +235,14 @@ class TFReader:
             self.feat, self.label, self.phone = readTFRecord_multilabel(
                 dir_tfdata,
                 args,
-                _shuffle=is_train,
-                transform=True)
+                _shuffle=training,
+                transform=transform)
         else:
             self.feat, self.label = readTFRecord(
                 dir_tfdata,
                 args,
-                _shuffle=is_train,
-                transform=True)
+                _shuffle=training,
+                transform=transform)
 
     def __iter__(self):
         """It is only a demo! Using `fentch_batch_with_TFbuckets` in practice."""

@@ -15,7 +15,7 @@ class Decoder(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, args, training, global_step, embed_table=None, name=None):
+    def __init__(self, args, training, global_step, name=None):
         '''EDDecoder constructor
         Args:
             conf: the decoder configuration as a configparser
@@ -33,11 +33,10 @@ class Decoder(object):
         self.training = training
         self.start_token = args.token2idx['<sos>'] # tf.fill([self.batch_size], args.token2idx['<sos>'])
         self.end_token = args.token2idx['<eos>']
-        self.embed_table = embed_table
         self.global_step = global_step
         self.start_warmup_steps = self.args.model.decoder.start_warmup_steps
 
-    def __call__(self, encoded, len_encoded):
+    def __call__(self, encoded, len_encoded, decoder_input):
         '''
         Create the variables and do the forward computation to decode an entire
         sequence
@@ -50,7 +49,7 @@ class Decoder(object):
                 of [batch_size x ... ] tensors
         '''
         with tf.variable_scope(self.name or 'decoder'):
-            logits, preds, len_decode = self.decode(encoded, len_encoded)
+            logits, preds, len_decode = self.decode(encoded, len_encoded, decoder_input)
 
         return logits, preds, len_decode
 

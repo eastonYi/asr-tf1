@@ -8,18 +8,18 @@ from tqdm import tqdm
 import numpy as np
 import editdistance as ed
 
-from utils.arguments import args
+from models.discriminator.clm import CLM
 from models.utils.tools import get_session, create_embedding, size_variables
 from models.utils.tfData import TFReader, readTFRecord
+from utils.arguments import args
 from utils.dataset import ASRDataLoader
 from utils.summaryTools import Summary
 from utils.performanceTools import dev, decode_test
 from utils.textTools import array_idx2char, array2text
 
-
 def train():
     print('reading data form ', args.dirs.train.tfdata)
-    dataReader_train = TFReader(args.dirs.train.tfdata, args=args, training=True, transform=True)
+    dataReader_train = TFReader(args.dirs.train.tfdata, args=args)
     batch_train = dataReader_train.fentch_batch_bucket()
 
     feat, label = readTFRecord(args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
@@ -29,17 +29,22 @@ def train():
 
     model = args.Model(
         tensor_global_step,
-        encoder=args.model.encoder.type,
-        decoder=args.model.decoder.type,
+        encoder=args.model.encoder.structure,
+        decoder=args.model.decoder.structure,
         batch=batch_train,
         training=True,
         args=args)
 
     model_infer = args.Model(
         tensor_global_step,
-        encoder=args.model.encoder.type,
-        decoder=args.model.decoder.type,
+        encoder=args.model.encoder.structure,
+        decoder=args.model.decoder.structure,
         training=False,
+        args=args)
+
+    clm = CLM(tensor_global_step,
+        training=True,
+        name='clm',
         args=args)
 
     size_variables()
@@ -140,8 +145,8 @@ def infer():
 
     model_infer = args.Model(
         tensor_global_step,
-        encoder=args.model.encoder.type,
-        decoder=args.model.decoder.type,
+        encoder=args.model.encoder.structure,
+        decoder=args.model.decoder.structure,
         training=False,
         args=args)
 
@@ -162,7 +167,7 @@ def infer():
         total_cer_len = 0
         total_wer_dist = 0
         total_wer_len = 0
-        with open('outputs/decoded.txt', 'w') as fw:
+        with open(args.dir_model.name+'_decode.txt', 'w') as fw:
             for sample in tqdm(dataset_dev):
                 if not sample:
                     continue
@@ -190,7 +195,7 @@ def infer():
                     cer_len = 1000
                     wer_len = 1000
                 if wer_dist/wer_len > 0:
-                    fw.write('uttid:\t{} \nres:\t{}\nref:\t{}\n\n'.format(sample['uttid'], res_txt, ref_txt))
+                    fw.write('id:\t{} \nres:\t{}\nref:\t{}\n\n'.format(sample['id'], res_txt, ref_txt))
                 logging.info('current cer: {:.3f}, wer: {:.3f};\tall cer {:.3f}, wer: {:.3f}'.format(
                     cer_dist/cer_len, wer_dist/wer_len, total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
         logging.info('dev CER {:.3f}:  WER: {:.3f}'.format(total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
@@ -213,8 +218,8 @@ def infer_lm():
 
     model_infer = args.Model(
         tensor_global_step,
-        encoder=args.model.encoder.type,
-        decoder=args.model.decoder.type,
+        encoder=args.model.encoder.structure,
+        decoder=args.model.decoder.structure,
         training=False,
         args=args)
 
@@ -288,8 +293,8 @@ def save(gpu, name=0):
 
     model_infer = args.Model(
         tensor_global_step,
-        encoder=args.model.encoder.type,
-        decoder=args.model.decoder.type,
+        encoder=args.model.encoder.structure,
+        decoder=args.model.decoder.structure,
         embed_table_decoder=embed,
         training=False,
         args=args)

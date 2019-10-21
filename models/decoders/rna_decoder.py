@@ -16,7 +16,7 @@ class RNADecoder(Decoder):
     """language model cold fusion
     """
 
-    def __init__(self, args, is_train, global_step, embed_table=None, name=None):
+    def __init__(self, args, is_train, global_step, name=None):
         self.num_layers = args.model.decoder.num_layers
         self.num_cell_units_de = args.model.decoder.num_cell_units
         self.dropout = args.model.decoder.dropout
@@ -24,13 +24,13 @@ class RNADecoder(Decoder):
         self.size_embedding = args.model.decoder.size_embedding
         self.dim_output = args.dim_output
         self.beam_size = args.beam_size
-        self.softmax_temperature = args.model.decoder.softmax_temperature
+        self.embed_table = self.get_embedding(self.dim_output, self.size_embedding)
         if args.lm_obj:
             logging.info('load language model object: {}'.format(args.lm_obj))
             self.lm = args.lm_obj
         else:
             self.lm = None
-        super().__init__(args, is_train, global_step, embed_table, name)
+        super().__init__(args, is_train, global_step, name)
 
 
     def _decode(self, encoded, len_encoded):
@@ -317,3 +317,17 @@ class RNADecoder(Decoder):
         updated_state_lm = tuple(updated_state_lm)
 
         return updated_logit_lm, updated_state_lm
+
+    def get_embedding(self, size_input, size_embedding):
+        '''
+        if embed_table is not none, return it; else we will create a trainable one
+        '''
+        if size_embedding:
+            with tf.device("/cpu:0"):
+                with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
+                    embed_table = tf.get_variable(
+                        "embedding", [size_input, size_embedding], dtype=tf.float32)
+        else:
+            embed_table = None
+
+        return embed_table

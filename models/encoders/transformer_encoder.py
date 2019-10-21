@@ -1,6 +1,6 @@
 import tensorflow as tf
 from .encoder import Encoder
-from utils.tfTools.attention import residual, multihead_attention, ff_hidden,\
+from ..utils.attention import residual, multihead_attention, ff_hidden,\
     attention_bias_ignore_padding, add_timing_signal_1d
 
 
@@ -12,10 +12,9 @@ class Transformer_Encoder(Encoder):
         self.hidden_units = args.model.encoder.num_cell_units
         self.num_heads = args.model.encoder.num_heads
         self.num_blocks = args.model.encoder.num_blocks
-        self._ff_activation = (lambda x, y: x * tf.sigmoid(y)) \
-                if args.model.encoder.activation == 'glu' else tf.nn.relu # glu
+        self._ff_activation = lambda x, y: x * tf.sigmoid(y)
 
-    def encode(self, features, len_feas):
+    def encode(self, features, len_features):
 
         encoder_output = tf.layers.dense(
             inputs=features,
@@ -33,7 +32,7 @@ class Transformer_Encoder(Encoder):
                                            rate=self.residual_dropout_rate,
                                            training=self.training)
         # Mask
-        encoder_padding = tf.equal(tf.sequence_mask(len_feas, maxlen=tf.shape(features)[1]), False) # bool tensor
+        encoder_padding = tf.equal(tf.sequence_mask(len_features, maxlen=tf.shape(features)[1]), False) # bool tensor
         encoder_attention_bias = attention_bias_ignore_padding(encoder_padding)
 
         # Blocks
@@ -65,4 +64,4 @@ class Transformer_Encoder(Encoder):
         # Mask padding part to zeros.
         encoder_output *= tf.expand_dims(1.0 - tf.to_float(encoder_padding), axis=-1)
 
-        return encoder_output, len_feas
+        return encoder_output, len_features

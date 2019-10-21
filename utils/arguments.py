@@ -106,7 +106,7 @@ elif args.dirs.type == 'scp_classify':
         args=args,
         _shuffle=False)
 else:
-    raise NotImplementedError('not dataset structure!')
+    raise NotImplementedError('not dataset type!')
 args.dataset_dev = dataset_dev
 args.dataset_train = dataset_train
 args.dataset_test = dataset_test
@@ -123,44 +123,43 @@ except:
 
 # model
 ## encoder
-if args.model.encoder.structure == 'transformer_encoder':
+if args.model.encoder.type == 'transformer_encoder':
     from models.encoders.transformer_encoder import Transformer_Encoder as encoder
-elif args.model.encoder.structure == 'conv_lstm':
+elif args.model.encoder.type == 'conv_lstm':
     from models.encoders.conv_lstm import CONV_LSTM as encoder
-elif args.model.encoder.structure == 'classifier':
+elif args.model.encoder.type == 'classifier':
     from models.encoders.classifier import CONV_LSTM_Classifier as encoder
-elif args.model.encoder.structure == 'BLSTM':
+elif args.model.encoder.type == 'BLSTM':
     from models.encoders.blstm import BLSTM as encoder
 else:
-    raise NotImplementedError('not found encoder structure: {}'.format(args.model.encoder.structure))
-args.model.encoder.structure = encoder
+    raise NotImplementedError('not found encoder type: {}'.format(args.model.encoder.type))
+args.model.encoder.type = encoder
 
 ## decoder
-
-try:
-    if args.model.decoder.structure == 'FC':
-        from models.decoders.fc_decoder import FCDecoder as decoder
-    elif args.model.decoder.structure == 'classifier':
-        from models.decoders.classifier import FCDecoder as decoder
-    elif args.model.decoder.structure == 'transformer_decoder':
-        from models.decoders.transformer_decoder import Transformer_Decoder as decoder
-    args.model.decoder.structure = decoder
-except:
-    print("not using decoder!")
-    args.model.decoder = AttrDict()
-    args.model.decoder.size_embedding = None
-    args.model.decoder.structure = None
+# try:
+if args.model.decoder.type == 'FC':
+    from models.decoders.fc_decoder import FCDecoder as decoder
+elif args.model.decoder.type == 'classifier':
+    from models.decoders.classifier import FCDecoder as decoder
+elif args.model.decoder.type == 'transformer_decoder':
+    from models.decoders.transformer_decoder import Transformer_Decoder as decoder
+args.model.decoder.type = decoder
+# except:
+#     print("not using decoder!")
+#     args.model.decoder = AttrDict()
+#     args.model.decoder.size_embedding = None
+#     args.model.decoder.type = None
 
 ## model
-if args.model.structure == 'Seq2SeqModel':
+if args.model.type == 'Seq2SeqModel':
     from models.seq2seqModel import Seq2SeqModel as Model
-elif args.model.structure == 'ctcModel':
+elif args.model.type == 'ctcModel':
     from models.ctcModel import CTCModel as Model
-elif args.model.structure == 'classifier':
+elif args.model.type == 'classifier':
     from models.classifier import Classifier as Model
-elif args.model.structure == 'transformer':
-    from models.Transformer import Transformer as Model
+elif args.model.type == 'transformer':
+    from models.transformer import Transformer as Model
 else:
-    raise NotImplementedError('not found Model structure!')
+    raise NotImplementedError('not found Model type!')
 
 args.Model = Model
