@@ -43,6 +43,17 @@ if not args.dir_checkpoint.is_dir(): args.dir_checkpoint.mkdir()
 # vocab
 args.token2idx, args.idx2token = load_vocab(args.dirs.vocab)
 args.dim_output = len(args.token2idx)
+if '<eos>' in args.token2idx.keys():
+    args.eos_idx = args.token2idx['<eos>']
+else:
+    args.eos_idx = None
+
+if '<sos>' in args.token2idx.keys():
+    args.sos_idx = args.token2idx['<sos>']
+elif '<blk>' in args.token2idx.keys():
+    args.sos_idx = args.token2idx['<blk>']
+else:
+    args.sos_idx = None
 
 args.dirs.train.tfdata = Path(args.dirs.train.tfdata)
 args.dirs.dev.tfdata = Path(args.dirs.dev.tfdata)

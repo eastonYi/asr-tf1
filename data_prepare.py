@@ -11,11 +11,11 @@ def main():
     # if confirm == "":
     #     print('will generate tfdata in 5 secs!')
     #     time.sleep(5)
-    save2tfrecord(args.dataset_dev, args.dirs.dev.tfdata)
-    save2tfrecord(args.dataset_train, args.dirs.train.tfdata, size_file=10000000)
+    # save2tfrecord(args.dataset_dev, args.dirs.dev.tfdata)
+    # save2tfrecord(args.dataset_train, args.dirs.train.tfdata, size_file=10000000)
     # print(args.data.dim_feature)
     # feat, label = readTFRecord(args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
-    # get_bucket(args.dirs.train.tfdata / 'feature_length.txt', args.num_batch_tokens, 999)
+    get_bucket(args.dirs.train.tfdata / 'feature_length.txt', args.num_batch_tokens, 600)
 
 
 if __name__ == '__main__':

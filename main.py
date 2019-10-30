@@ -75,8 +75,12 @@ def train():
     config.gpu_options.allow_growth = True
     config.log_device_placement = False
     with tf.train.MonitoredTrainingSession(config=config) as sess:
-        if args.dirs.checkpoint_init:
-            checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_init)
+        # for i in range(100):
+        #     batch = sess.run(batch_train)
+        #     print(batch[0].shape)
+
+        if args.dirs.checkpoint:
+            checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
             saver.restore(sess, checkpoint)
 
         elif args.dirs.lm_checkpoint:
@@ -106,7 +110,7 @@ def train():
             if global_step % args.save_step == args.save_step - 1:
                 saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step, write_meta_graph=True)
 
-            if global_step % args.dev_step == args.dev_step - 1:
+            if global_step % args.dev_step == args.dev_step -1:
                 cer, wer = dev(
                     step=global_step,
                     dataloader=dataloader_dev,
@@ -155,7 +159,7 @@ def infer():
     config.gpu_options.allow_growth = True
     config.log_device_placement = False
     with tf.train.MonitoredTrainingSession(config=config) as sess:
-        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_init)
+        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
         saver.restore(sess, checkpoint)
 
         total_cer_dist = 0
@@ -227,7 +231,7 @@ def infer_lm():
     config.gpu_options.allow_growth = True
     config.log_device_placement = False
     with tf.train.MonitoredTrainingSession(config=config) as sess:
-        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_init)
+        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
         checkpoint_lm = tf.train.latest_checkpoint(args.dirs.lm_checkpoint)
         saver.restore(sess, checkpoint)
         saver_lm.restore(sess, checkpoint_lm)
@@ -303,7 +307,7 @@ def save(gpu, name=0):
     config.gpu_options.allow_growth = True
     config.log_device_placement = False
     with tf.train.MonitoredTrainingSession(config=config) as sess:
-        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_init)
+        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
         saver.restore(sess, checkpoint)
         if not name:
             name = args.dir_model.name
@@ -336,24 +340,28 @@ if __name__ == '__main__':
     param = parser.parse_args()
 
     print('CUDA_VISIBLE_DEVICES: ', args.gpus)
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
 
     if param.mode == 'infer':
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
         logging.info('enter the INFERING phrase')
         infer()
 
     elif param.mode == 'infer_lm':
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
         logging.info('enter the INFERING phrase')
         infer_lm()
 
     elif param.mode == 'save':
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
         logging.info('enter the SAVING phrase')
         save(gpu=param.gpu, name=param.name)
 
     elif param.mode == 'train':
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
+        if param.name:
+            args.dir_exps = args.dir_exps / param.name
+            args.dir_log = args.dir_exps / 'log'
+            args.dir_checkpoint = args.dir_exps / 'checkpoint'
+            if not args.dir_exps.is_dir(): args.dir_exps.mkdir()
+            if not args.dir_log.is_dir(): args.dir_log.mkdir()
+            if not args.dir_checkpoint.is_dir(): args.dir_checkpoint.mkdir()
         logging.info('enter the TRAINING phrase')
         train()
 
