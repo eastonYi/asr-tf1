@@ -630,7 +630,7 @@ class TextDataSet(LMDataSet):
             with open(filename) as f:
                 for line in f:
                     line = line.strip().split()
-                    if len(line) > self.args.model.D.max_label_len:
+                    if len(line) > self.args.max_label_len:
                         continue
                     text_ids = [self.token2idx[word] for word in line]
 

@@ -8,71 +8,64 @@ from tqdm import tqdm
 import numpy as np
 import editdistance as ed
 
-from models.discriminator.clm import CLM
 from models.utils.tools import get_session, create_embedding, size_variables
 from models.utils.tfData import TFReader, readTFRecord
 from utils.arguments import args
-from utils.dataset import ASRDataLoader
+from utils.dataset import ASRDataLoader, TextDataSet
 from utils.summaryTools import Summary
 from utils.performanceTools import dev, decode_test
 from utils.textTools import array_idx2char, array2text
+from utils.tools import get_batch_length
+
 
 def train():
     print('reading data form ', args.dirs.train.tfdata)
     dataReader_train = TFReader(args.dirs.train.tfdata, args=args)
     batch_train = dataReader_train.fentch_batch_bucket()
+    dataReader_untrain = TFReader(args.dirs.untrain.tfdata, args=args)
+    batch_untrain = dataReader_untrain.fentch_batch_bucket()
 
-    feat, label = readTFRecord(args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
-    dataloader_dev = ASRDataLoader(args.dataset_dev, args, feat, label, batch_size=args.batch_size, num_loops=1)
+    dataset_text = TextDataSet(list_files=[args.dirs.text.data], args=args, _shuffle=True)
+    tfdata_train = tf.data.Dataset.from_generator(
+        dataset_text, (tf.int32), (tf.TensorShape([None])))
+    iter_text = tfdata_train.cache().repeat().shuffle(1000).\
+        padded_batch(args.text_batch_size, ([args.max_label_len])).prefetch(buffer_size=5).\
+        make_one_shot_iterator().get_next()
+
+    feat, label = readTFRecord(args.dirs.dev.tfdata, args,
+                               _shuffle=False, transform=True)
+    dataloader_dev = ASRDataLoader(args.dataset_dev, args, feat, label,
+                                   batch_size=args.batch_size, num_loops=1)
 
     tensor_global_step = tf.train.get_or_create_global_step()
 
-    model = args.Model(
+    G = args.Model(
         tensor_global_step,
-        encoder=args.model.encoder.structure,
-        decoder=args.model.decoder.structure,
+        encoder=args.model.encoder.type,
+        decoder=args.model.decoder.type,
         batch=batch_train,
         training=True,
         args=args)
 
-    model_infer = args.Model(
+    G_infer = args.Model(
         tensor_global_step,
-        encoder=args.model.encoder.structure,
-        decoder=args.model.decoder.structure,
+        encoder=args.model.encoder.type,
+        decoder=args.model.decoder.type,
         training=False,
         args=args)
 
-    clm = CLM(tensor_global_step,
+    D = args.Model_D(
+        tensor_global_step,
         training=True,
-        name='clm',
+        name='discriminator',
         args=args)
+
+    gan = args.GAN(tensor_global_step, G, D,
+                   batch=batch_untrain, name='GAN', args=args)
 
     size_variables()
     start_time = datetime.now()
-
     saver = tf.train.Saver(max_to_keep=15)
-    if args.dirs.lm_checkpoint:
-        from tfTools.checkpointTools import list_variables
-
-        list_lm_vars_pretrained = list_variables(args.dirs.lm_checkpoint)
-        list_lm_vars = model.decoder.lm.variables
-
-        dict_lm_vars = {}
-        for var in list_lm_vars:
-            if 'embedding' in var.name:
-                for var_pre in list_lm_vars_pretrained:
-                    if 'embedding' in var_pre[0]:
-                        break
-            else:
-                name = var.name.split(model.decoder.lm.name)[1].split(':')[0]
-                for var_pre in list_lm_vars_pretrained:
-                    if name in var_pre[0]:
-                        break
-            # 'var_name_in_checkpoint': var_in_graph
-            dict_lm_vars[var_pre[0]] = var
-
-        saver_lm = tf.train.Saver(dict_lm_vars)
-
     summary = Summary(str(args.dir_log))
 
     config = tf.ConfigProto()
@@ -84,29 +77,32 @@ def train():
             checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_init)
             saver.restore(sess, checkpoint)
 
-        elif args.dirs.lm_checkpoint:
-            lm_checkpoint = tf.train.latest_checkpoint(args.dirs.lm_checkpoint)
-            saver_lm.restore(sess, lm_checkpoint)
-
         dataloader_dev.sess = sess
 
         batch_time = time()
         num_processed = 0
         progress = 0
         while progress < args.num_epochs:
-            global_step, lr = sess.run([tensor_global_step, model.learning_rate])
-            loss, shape_batch, _, _ = sess.run(model.list_run)
+            global_step, lr_G, lr_D = sess.run([tensor_global_step, G.learning_rate, D.learning_rate])
+            text = sess.run(iter_text)
+            text_lens = get_batch_length(text)
+            loss_G, _ = sess.run(gan.list_train_G)
+            loss_D, _ = sess.run(gan.list_train_D, feed_dict={gan.list_pl[0]:text, gan.list_pl[1]:text_lens})
+            shape_feature = sess.run(gan.list_info[0])
+            shape_text = text.shape 
 
-            num_processed += shape_batch[0]
+            num_processed += shape_feature[0]
             used_time = time()-batch_time
             batch_time = time()
             progress = num_processed/args.data.train_size
 
             if global_step % 10 == 0:
-                logging.info('loss: {:.3f}\tbatch: {} lr:{:.6f} time:{:.2f}s {:.3f}% step: {}'.format(
-                              loss, shape_batch, lr, used_time, progress*100.0, global_step))
-                summary.summary_scalar('loss', loss, global_step)
-                summary.summary_scalar('lr', lr, global_step)
+                logging.info('loss: {:.3f}|{:.3f}\tbatch: {}|{} lr:{:.4f}|{:.4f} time:{:.2f}s {:.3f}% step: {}'.format(
+                              loss_G, loss_D, shape_feature, shape_text, lr_G, lr_D, used_time, progress*100.0, global_step))
+                summary.summary_scalar('loss_G', loss_G, global_step)
+                summary.summary_scalar('loss_D', loss_D, global_step)
+                summary.summary_scalar('lr_G', lr_G, global_step)
+                summary.summary_scalar('lr_D', lr_D, global_step)
 
             if global_step % args.save_step == args.save_step - 1:
                 saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step, write_meta_graph=True)
@@ -115,7 +111,7 @@ def train():
                 cer, wer = dev(
                     step=global_step,
                     dataloader=dataloader_dev,
-                    model=model_infer,
+                    model=G_infer,
                     sess=sess,
                     unit=args.data.unit,
                     idx2token=args.idx2token,
@@ -129,7 +125,7 @@ def train():
                 decode_test(
                     step=global_step,
                     sample=args.dataset_test[10],
-                    model=model_infer,
+                    model=G_infer,
                     sess=sess,
                     unit=args.data.unit,
                     idx2token=args.idx2token,
@@ -145,8 +141,8 @@ def infer():
 
     model_infer = args.Model(
         tensor_global_step,
-        encoder=args.model.encoder.structure,
-        decoder=args.model.decoder.structure,
+        encoder=args.model.encoder.type,
+        decoder=args.model.decoder.type,
         training=False,
         args=args)
 
@@ -218,8 +214,8 @@ def infer_lm():
 
     model_infer = args.Model(
         tensor_global_step,
-        encoder=args.model.encoder.structure,
-        decoder=args.model.decoder.structure,
+        encoder=args.model.encoder.type,
+        decoder=args.model.decoder.type,
         training=False,
         args=args)
 
@@ -282,7 +278,6 @@ def infer_lm():
 
 def save(gpu, name=0):
     from utils.IO import store_2d
-    import pickle
 
     tensor_global_step = tf.train.get_or_create_global_step()
 
@@ -293,8 +288,8 @@ def save(gpu, name=0):
 
     model_infer = args.Model(
         tensor_global_step,
-        encoder=args.model.encoder.structure,
-        decoder=args.model.decoder.structure,
+        encoder=args.model.encoder.type,
+        decoder=args.model.decoder.type,
         embed_table_decoder=embed,
         training=False,
         args=args)

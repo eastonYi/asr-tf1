@@ -30,65 +30,67 @@ class Transformer(Seq2SeqModel):
         super().__init__(tensor_global_step, encoder, decoder, training, \
                          args, batch, name=name)
 
+    def __call__(self, feature, len_features, labels=None, len_labels=None):
+
+        encoder = self.gen_encoder(
+            training=self.training,
+            args=self.args)
+        decoder = self.gen_decoder(
+            training=self.training,
+            global_step=self.global_step,
+            args=self.args)
+
+        with tf.variable_scope(encoder.name or 'encoder'):
+            encoded, len_encoded = encoder(feature, len_features)
+
+        with tf.variable_scope(decoder.name or 'decoder'):
+
+            if labels is None: # infer phrases
+                if self.args.beam_size>1:
+                    logging.info('beam search with language model ...')
+                    results, preds, len_decoded = decoder.beam_decode_rerank(
+                        encoded,
+                        len_encoded)
+                else:
+                    logging.info('gready search ...')
+                    logits, preds, len_decoded = decoder.decoder_with_caching(
+                        encoded,
+                        len_encoded)
+            else:
+                logging.info('teacher-forcing training ...')
+                assert len_labels is not None
+                labels_sos = decoder.build_input(labels)
+                logits, preds, len_decoded = decoder.decode(
+                    encoded=encoded,
+                    len_encoded=len_encoded,
+                    decoder_input=labels_sos)
+
+        return logits, preds, len_decoded
+
     def build_single_graph(self, id_gpu, name_gpu, tensors_input):
+        feature = tensors_input.feature_splits[id_gpu]
+        len_features = tensors_input.len_feat_splits[id_gpu]
+        labels = tensors_input.label_splits[id_gpu] if tensors_input.label_splits else None
+        len_labels = tensors_input.len_label_splits[id_gpu] if tensors_input.len_label_splits else None
 
         with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
-            encoder = self.gen_encoder(
-                training=self.training,
-                args=self.args)
-            decoder = self.gen_decoder(
-                training=self.training,
-                global_step=self.global_step,
-                args=self.args)
 
-            with tf.variable_scope(encoder.name or 'encoder'):
-                encoded, len_encoded = encoder(
-                    features=tensors_input.feature_splits[id_gpu],
-                    len_features=tensors_input.len_feat_splits[id_gpu])
-
-            with tf.variable_scope(decoder.name or 'decoder'):
-                decoder_input = decoder.build_input(
-                    id_gpu=id_gpu,
-                    tensors_input=tensors_input)
-
-                if (not self.training) or (self.args.model.training_type == 'self-learning'):
-                    '''
-                    training_type:
-                        - self-learning: get logits fully depend on self
-                        - teacher-forcing: get logits depend on labels during training
-                    '''
-                    # infer phrases
-                    if self.args.beam_size>1:
-                        logging.info('beam search with language model ...')
-                        results, preds, len_decoded = decoder.beam_decode_rerank(
-                            encoded,
-                            len_encoded)
-                    else:
-                        logging.info('gready search ...')
-                        results, preds, len_decoded = decoder.decoder_with_caching(
-                            encoded,
-                            len_encoded)
-                else:
-                    logging.info('teacher-forcing training ...')
-                    decoder_input_labels = decoder_input.input_labels * tf.sequence_mask(
-                        decoder_input.len_labels,
-                        maxlen=tf.shape(decoder_input.input_labels)[1],
-                        dtype=tf.int32)
-                    logits, preds, _ = decoder.decode(
-                        encoded=encoded,
-                        len_encoded=len_encoded,
-                        decoder_input=decoder_input_labels)
+            logits, preds, len_decoded = self(
+                feature,
+                len_features,
+                labels,
+                len_labels)
 
             if self.training:
                 loss = self.ce_loss(
                     logits=logits,
-                    labels=decoder_input.output_labels[:, :tf.shape(logits)[1]],
-                    len_labels=decoder_input.len_labels)
+                    labels=labels[:, :tf.shape(logits)[1]],
+                    len_labels=len_labels)
 
                 with tf.name_scope("gradients"):
                     assert loss.get_shape().ndims == 1
                     loss = tf.reduce_mean(loss)
-                    gradients = self.optimizer.compute_gradients(loss)
+                    gradients = self.optimizer.compute_gradients(loss, var_list=self.trainable_variables())
 
         self.__class__.num_Model += 1
         logging.info('\tbuild {} on {} succesfully! total model number: {}'.format(
@@ -98,4 +100,4 @@ class Transformer(Seq2SeqModel):
             # no_op is preserved for debug info to pass
             return loss, gradients, [preds, tensors_input.label_splits[id_gpu]]
         else:
-            return results, len_decoded, preds
+            return logits, len_decoded, preds

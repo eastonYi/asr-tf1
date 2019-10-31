@@ -154,6 +154,8 @@ elif args.model.decoder.type == 'classifier':
     from models.decoders.classifier import FCDecoder as decoder
 elif args.model.decoder.type == 'transformer_decoder':
     from models.decoders.transformer_decoder import Transformer_Decoder as decoder
+else:
+    raise NotImplementedError('not found decoder type: {}'.format(args.model.decoder.type))
 args.model.decoder.type = decoder
 # except:
 #     print("not using decoder!")
@@ -174,3 +176,14 @@ else:
     raise NotImplementedError('not found Model type!')
 
 args.Model = Model
+
+
+if args.model_D:
+    if args.model_D.type == 'clm':
+        from models.discriminator.clm import CLM as Model_D
+    else:
+        raise NotImplementedError('not found Model type!')
+    args.Model_D = Model_D
+
+    from models.gan import GAN
+    args.GAN = GAN

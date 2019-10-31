@@ -1,0 +1,83 @@
+dirs:
+    exp: libri
+    train:
+        scp: /mnt/lustre/xushuang2/easton/data/libriSpeech/feats/feats.train-100.scp
+        trans: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/train-100.trans
+        tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/train-100_xy_eos
+    untrain:
+        scp: /mnt/lustre/xushuang2/easton/data/libriSpeech/feats/feats.train-960.scp
+        trans: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/train-960.trans
+        tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/train-960_xy_eos
+    dev:
+        scp: /mnt/lustre/xushuang2/easton/data/libriSpeech/feats/feats.dev-clean.scp
+        trans: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/dev-clean.trans
+        tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/dev-clean_xy_eos
+    test:
+        scp: /mnt/lustre/xushuang2/easton/data/libriSpeech/feats/feats.test-clean.scp
+        trans: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/test-clean.trans
+        tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/test-clean_xy_eos
+    text:
+        data: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/text-960.txt
+    type: scp
+    vocab: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/subword_3726.vocab
+    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer/test2/checkpoint
+
+data:
+    featType: mfcc
+    left_context: 2
+    right_context: 0
+    downsample: 3
+    add_delta: False
+    unit: subword
+
+model:
+    type: transformer
+    encoder:
+        type: transformer_encoder
+        num_blocks: 6
+        num_heads: 8
+        num_cell_units: 512
+        attention_dropout_rate: 0.1
+        residual_dropout_rate: 0.1
+    decoder:
+        type: transformer_decoder
+        size_embedding: 512
+        num_blocks: 6
+        num_heads: 8
+        num_cell_units: 512
+        attention_dropout_rate: 0.1
+        residual_dropout_rate: 0.1
+        init_scale: 0.04
+        label_smoothing: 0.9
+        max_decode_len: 100
+model_D:
+    type: clm
+    num_hidden: 512
+    num_blocks: 6
+
+optimizer: adam
+warmup_steps: 20000
+peak: 0.0002
+decay_steps: 20000
+
+dev_step: 600
+decode_step: 600
+save_step: 600
+num_epochs: 999
+
+# gpus: '0,1,2,3'
+gpus: '0'
+batch_size: 60
+beam_size: 1
+text_batch_size: 60
+max_label_len: 100
+num_batch_tokens: 1000
+# bucket_boundaries: 229,331,388,417,436,450,462,472,481,489,496,503,510,517,524,531,547,817
+bucket_boundaries: 227,336,398,429,449,465,477,488,498,508,517,527,542,990
+
+lambda_l2: 0.0
+lambda_lm: 0.0
+grad_clip_value: 0.0
+slot_clip_value: 0.0
+grad_clip_norm: 0.0
+grad_clip_global_norm: 0.0

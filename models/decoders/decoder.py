@@ -53,7 +53,7 @@ class Decoder(object):
 
         return logits, preds, len_decode
 
-    def build_input(self, id_gpu, tensors_input):
+    def build_input(self, labels):
         """
         the decoder label input is tensors_input.labels left concat <sos>,
         the lengths correspond add 1.
@@ -63,26 +63,14 @@ class Decoder(object):
         we need to pass the tensors_input in to judge whether there is
         tensors_input.label_splits
         """
-        decoder_input = namedtuple('decoder_input',
-            'input_labels, output_labels, len_labels')
-
         assert self.start_token, self.end_token
 
-        if tensors_input.label_splits:
-            # in the training mode, so that label is provided
-            decoder_input.output_labels = tensors_input.label_splits[id_gpu]
-            decoder_input.input_labels = right_shift_rows(
-                p=tensors_input.label_splits[id_gpu],
-                shift=1,
-                pad=self.start_token)
-            decoder_input.len_labels = tensors_input.len_label_splits[id_gpu]
-        else:
-            # in the infer mode, so no label is provided
-            decoder_input.output_labels = None
-            decoder_input.input_labels = None
-            decoder_input.len_labels = None
+        labels_sos = right_shift_rows(
+            p=labels,
+            shift=1,
+            pad=self.start_token)
 
-        return decoder_input
+        return labels_sos
 
     def teacher_forcing(self, encoded, len_encoded, target_labels, max_len):
         with tf.variable_scope(self.name or 'decoder'):

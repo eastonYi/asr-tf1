@@ -9,6 +9,13 @@ import os
 from tempfile import mkstemp
 
 
+def get_batch_length(batch):
+    if batch.ndim == 3:
+        return np.sum(np.max(np.abs(batch) > 0, -1), -1)
+    elif batch.ndim == 2:
+        return np.sum(np.abs(batch) > 0, -1)
+
+
 def mkdirs(filename):
     if not filename.parent.is_dir():
         mkdirs(filename.parent)

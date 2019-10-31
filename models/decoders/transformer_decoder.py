@@ -15,6 +15,7 @@ class Transformer_Decoder(RNADecoder):
         self.args = args
         self.num_blocks = args.model.decoder.num_blocks
         self.num_cell_units = args.model.decoder.num_cell_units
+        self.max_decode_len = args.model.decoder.max_decode_len
         self.attention_dropout_rate = args.model.decoder.attention_dropout_rate if training else 0.0
         self.residual_dropout_rate = args.model.decoder.residual_dropout_rate if training else 0.0
         self.num_heads = args.model.decoder.num_heads
@@ -22,7 +23,6 @@ class Transformer_Decoder(RNADecoder):
         self._ff_activation = lambda x, y: x * tf.sigmoid(y)
         self.lambda_lm = self.args.lambda_lm
         super().__init__(args, training, global_step, name)
-
 
     def decode(self, encoded, len_encoded, decoder_input):
         # used for MLE training
@@ -84,7 +84,7 @@ class Transformer_Decoder(RNADecoder):
                 tf.reduce_any(tf.logical_not(finished)),
                 tf.less(
                     i,
-                    tf.reduce_min([tf.shape(encoded)[1], self.args.max_len]) # maxlen = 25
+                    tf.reduce_min([tf.shape(encoded)[1], self.max_decode_len]) # maxlen = 25
                 )
             )
 
@@ -173,7 +173,7 @@ class Transformer_Decoder(RNADecoder):
         # encoder_padding = tf.equal(tf.reduce_sum(tf.abs(encoder_output), axis=-1), 0.0)
         encoder_padding = tf.equal(tf.sequence_mask(len_encoded, maxlen=tf.shape(encoder_output)[1]), False) # bool tensor
         # [-0 -0 -0 -0 -0 -0 -0 -0 -0 -1e+09] the pading place is -1e+09
-        encoder_attention_bias =attention_bias_ignore_padding(encoder_padding)
+        encoder_attention_bias = attention_bias_ignore_padding(encoder_padding)
 
         decoder_output = self.embedding(decoder_input)
         # Positional Encoding
