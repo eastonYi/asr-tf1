@@ -3,6 +3,7 @@ import logging
 from collections import namedtuple
 
 from .utils.gradientTools import average_gradients, handle_gradients
+from .utils.tools import batch3D_pad_to
 
 
 class GAN:
@@ -16,7 +17,8 @@ class GAN:
         self.G = G
         self.D = D
         self.batch = batch
-        self.global_step = tensor_global_step
+        self.global_step0 = tensor_global_step[0]
+        self.global_step1 = tensor_global_step[1]
         self.num_gpus = args.num_gpus
         self.list_gpu_devices = args.list_gpus
         self.name = name
@@ -25,8 +27,7 @@ class GAN:
         self.list_train_G, self.list_train_D, self.list_info = self.build_graph()
 
     def build_graph(self):
-        # tf.get_default_graph().get_name_scope().reuse_variables()
-        tf.get_variable_scope().reuse_variables()
+        self.build_optimizer()
         tensors_input = self.build_input()
 
         loss_D_step = []; loss_G_step = []
@@ -47,11 +48,11 @@ class GAN:
             averaged_D_grads = average_gradients(tower_D_grads)
             handled_D_grads = handle_gradients(averaged_D_grads, self.args)
             # with tf.variable_scope(tf.get_default_graph().get_name_scope(), reuse=True):
-            op_optimize_D = self.D.optimizer.apply_gradients(handled_D_grads, self.global_step)
+            op_optimize_D = self.optimizer_D.apply_gradients(handled_D_grads, self.global_step0)
             averaged_G_grads = average_gradients(tower_G_grads)
             handled_G_grads = handle_gradients(averaged_G_grads, self.args)
             # with tf.variable_scope(tf.get_default_graph().get_name_scope(), reuse=True):
-            op_optimize_G = self.G.optimizer.apply_gradients(handled_G_grads, self.global_step)
+            op_optimize_G = self.optimizer_G.apply_gradients(handled_G_grads, self.global_step1)
 
         self.__class__.num_Instances += 1
         logging.info("built {} {} instance(s).".format(
@@ -69,23 +70,38 @@ class GAN:
         len_text = tensors_input.len_text_splits[id_gpu]
 
         with tf.device(name_gpu):
+            # G loss
             with tf.variable_scope(self.G.name, reuse=True):
                 logits_G, preds, len_decoded = self.G(feature, len_features)
+
+            # D loss fake
             with tf.variable_scope(self.D.name, reuse=True):
+                logits_G = batch3D_pad_to(logits_G, length=self.args.max_label_len)
                 logits_D_res = self.D(logits_G, len_decoded)
                 loss_D_res = tf.reduce_mean(logits_D_res)
+
+            # D loss real
             with tf.variable_scope(self.D.name, reuse=True):
                 feature_text = tf.one_hot(text, self.args.dim_output)
                 logits_D_text = self.D(feature_text, len_text)
                 loss_D_text = -tf.reduce_mean(logits_D_text)
 
-            loss_D = loss_D_text + loss_D_res
+            # D loss greadient penalty
+            with tf.variable_scope(self.D.name, reuse=True):
+                # idx = tf.random.uniform(
+                #     (), maxval=(self.args.text_batch_size-self.args.batch_size), dtype=tf.int32)
+                gp = self.D.gradient_penalty(
+                    # real=feature_text[idx:idx+4],
+                    real=feature_text[0:tf.shape(logits_G)[0]],
+                    fake=logits_G)
+
+            loss_D = loss_D_text + loss_D_res + 10.0 * gp
             loss_G = -loss_D_res
 
             with tf.name_scope("gradients"):
-                gradients_D = self.D.optimizer.compute_gradients(
+                gradients_D = self.optimizer_D.compute_gradients(
                     loss_D, var_list=self.D.trainable_variables)
-                gradients_G = self.G.optimizer.compute_gradients(
+                gradients_G = self.optimizer_G.compute_gradients(
                     loss_G, var_list=self.G.trainable_variables)
 
         self.__class__.num_Model += 1
@@ -107,7 +123,7 @@ class GAN:
             batch_text_lens = tf.placeholder(tf.int32, [None], name='input_label_lens')
             self.list_pl = [batch_text, batch_text_lens]
             # split input data alone batch axis to gpus
-            tensors_input.feature_splits = tf.split(self.batch[0], self.num_gpus, name="feature_splits")
+            tensors_input.feature_splits = tf.split(self.batch[0][:, :self.args.max_feat_len, :], self.num_gpus, name="feature_splits")
             tensors_input.len_feat_splits = tf.split(self.batch[2], self.num_gpus, name="len_feat_splits")
             tensors_input.text_splits = tf.split(batch_text, self.num_gpus, name="text_splits")
             tensors_input.len_text_splits = tf.split(batch_text_lens, self.num_gpus, name="len_text_splits")
@@ -115,3 +131,20 @@ class GAN:
         tensors_input.shape_text = tf.shape(batch_text)
 
         return tensors_input
+
+    def build_optimizer(self):
+        self.learning_rate_G = tf.convert_to_tensor(self.args.lr)
+        self.learning_rate_D = tf.convert_to_tensor(self.args.lr)
+        self.optimizer_G = tf.convert_to_tensor(self.args.lr)
+
+        self.optimizer_D = tf.train.AdamOptimizer(self.learning_rate_D,
+                                                  beta1=0.9,
+                                                  beta2=0.98,
+                                                  epsilon=1e-9,
+                                                  name='optimizer_D')
+
+        self.optimizer_G = tf.train.AdamOptimizer(self.learning_rate_G,
+                                                  beta1=0.9,
+                                                  beta2=0.98,
+                                                  epsilon=1e-9,
+                                                  name='optimizer_G')

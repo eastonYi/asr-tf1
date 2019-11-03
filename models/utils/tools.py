@@ -165,7 +165,7 @@ def batch_pad(p, length, pad, direct='head'):
     return res
 
 
-def batch_pad_to(p, length, pad):
+def batch2D_pad_to(p, length, pad):
     """
     expend the 2d tensor to assigned length
     """
@@ -173,6 +173,19 @@ def batch_pad_to(p, length, pad):
     pad_length = tf.reduce_max([length_p, length])-length_p
 
     pad = tf.cast(tf.fill(dims=[tf.shape(p)[0], pad_length], value=pad), dtype=p.dtype)
+    res = tf.concat([p, pad], axis=1)
+
+    return res
+
+
+def batch3D_pad_to(p, length, pad=0.0):
+    """
+    expend the 3d tensor to assigned length
+    """
+    length_p = tf.shape(p)[1]
+    pad_length = tf.reduce_max([length_p, length])-length_p
+
+    pad = tf.cast(tf.fill(dims=[tf.shape(p)[0], pad_length, tf.shape(p)[-1]], value=pad), dtype=p.dtype)
     res = tf.concat([p, pad], axis=1)
 
     return res
@@ -208,7 +221,7 @@ def pad_to_same(list_tensors):
     len_max = tf.reduce_max(tf.stack(list_lens, 0))
     list_padded = []
     for tensor in list_tensors:
-        list_padded.append(batch_pad_to(tensor, len_max, 0))
+        list_padded.append(batch2D_pad_to(tensor, len_max, 0))
 
     return list_padded
 

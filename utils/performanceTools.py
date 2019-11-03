@@ -2,11 +2,9 @@
 import numpy as np
 from time import time
 import logging
-from utils.textTools import array2text
-import editdistance as ed
-from itertools import repeat
+import sys
 
-from .textTools import array_idx2char, unpadding, batch_wer, batch_cer, array2text
+from .textTools import batch_wer, batch_cer, array2text
 
 
 def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0, max_idx=None):
@@ -53,8 +51,10 @@ def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0,
         batch_time = time()
         processed += shape_batch[0]
         progress = processed/len(dataloader)
-        logging.warning('batch cer: {:.3f}\twer: {:.3f} batch: {}\t time:{:.2f}s {:.3f}%'.format(
+        sys.stdout.write('\rbatch cer: {:.3f}\twer: {:.3f} batch: {}\t time:{:.2f}s {:.3f}%'.format(
                      _cer, _wer, shape_batch, used_time, progress*100.0))
+        sys.stdout.flush()
+        
     used_time = time() - start_time
     cer = total_cer_dist/total_cer_len
     wer = total_wer_dist/total_wer_len

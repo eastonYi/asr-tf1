@@ -22,6 +22,8 @@ if args.bucket_boundaries:
 assert args.num_batch_tokens
 args.list_batch_size = ([int(args.num_batch_tokens / boundary) * args.num_gpus
         for boundary in (args.list_bucket_boundaries)] + [args.num_gpus])
+args.batch_size *= args.num_gpus
+args.text_batch_size *= args.num_gpus
 logging.info('\nbucket_boundaries: {} \nbatch_size: {}'.format(
     args.list_bucket_boundaries, args.list_batch_size))
 

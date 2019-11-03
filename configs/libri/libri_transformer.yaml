@@ -16,7 +16,7 @@ dirs:
         tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/test-clean_xy_eos
     type: scp
     vocab: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/subword_3726.vocab
-    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer/test2/checkpoint
+    checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer/test/checkpoint
 
 data:
     featType: mfcc
@@ -45,11 +45,12 @@ model:
         residual_dropout_rate: 0.1
         init_scale: 0.04
         label_smoothing: 0.9
+        max_decode_len: 100
 
 optimizer: adam
-warmup_steps: 20000
+warmup_steps: 10000
 peak: 0.0002
-decay_steps: 20000
+decay_steps: 10000
 
 dev_step: 600
 decode_step: 600
@@ -60,10 +61,10 @@ gpus: '0,1,2,3'
 # gpus: '2'
 batch_size: 60
 beam_size: 1
-max_len: 100
+max_label_len: 100
 num_batch_tokens: 11000
-# bucket_boundaries: 229,331,388,417,436,450,462,472,481,489,496,503,510,517,524,531,547,817
-bucket_boundaries: 227,336,398,429,449,465,477,488,498,508,517,527,542,990
+bucket_boundaries: 229,331,388,417,436,450,462,472,481,489,496,503,510,517,524,531,547,817
+# bucket_boundaries: 227,336,398,429,449,465,477,488,498,508,517,527,542,990
 
 lambda_l2: 0.0
 lambda_lm: 0.0

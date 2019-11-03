@@ -766,7 +766,7 @@ class DataLoader(SimpleDataLoader):
                 batch = (caches[bucket][0], caches[bucket][1])
                 yield self.padding_list_seq_with_labels(*batch)
                 caches[bucket] = [[], [], 0]
-                logging.info('empty the bucket {}'.format(bucket))
+                # logging.info('empty the bucket {}'.format(bucket))
 
 
 class ASRDataLoader(DataLoader):

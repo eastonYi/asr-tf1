@@ -252,13 +252,13 @@ class TFReader:
         for i in range(len(self.args.data.size_dev)):
             yield self.sess.run([self.feat, self.label])
 
-    def fentch_batch(self):
+    def fentch_batch(self, batch_size):
         list_inputs = [self.feat, self.label, tf.shape(self.feat)[0], tf.shape(self.label)[0]]
         list_outputs = tf.train.batch(
             tensors=list_inputs,
-            batch_size=16,
+            batch_size=batch_size,
             num_threads=8,
-            capacity=500,
+            capacity=30,
             dynamic_pad=True,
             allow_smaller_final_batch=True
         )

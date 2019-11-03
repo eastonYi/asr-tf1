@@ -67,3 +67,23 @@ class CLM(LSTM_Model):
         tensors_input.shape_batch = tf.shape(batch_features)
 
         return tensors_input
+
+    def gradient_penalty(self, real, fake):
+
+        def _interpolate(a, b):
+            batch_size = tf.shape(real)[0]
+            epsilon = tf.random_uniform(
+                shape=[batch_size, 1, 1], minval=0., maxval=1.)
+            interpolated = real + epsilon * (fake - real)
+
+            return interpolated
+
+        # assert real.shape == fake.shape
+        x = _interpolate(real, fake)
+        pred = self(x)
+        grad = tf.gradients(pred, x)
+        norm = tf.norm(tf.reshape(grad, [tf.shape(grad)[0], -1]), axis=1)
+        # norm = tf.sqrt(1e-8 + tf.reduce_sum(tf.square(grad), axis=[1, 2, 3]))
+        gp = tf.reduce_mean((norm - 1.)**2)
+
+        return gp

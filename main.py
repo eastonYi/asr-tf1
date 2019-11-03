@@ -2,6 +2,7 @@
 from datetime import datetime
 from time import time
 import os
+import sys
 import logging
 import tensorflow as tf
 from tqdm import tqdm
@@ -167,7 +168,7 @@ def infer():
         total_wer_dist = 0
         total_wer_len = 0
         with open('outputs/decoded.txt', 'w') as fw:
-            for sample in tqdm(dataset_dev):
+            for i, sample in enumerate(dataset_dev):
                 if not sample:
                     continue
                 dict_feed = {model_infer.list_pl[0]: np.expand_dims(sample['feature'], axis=0),
@@ -195,8 +196,10 @@ def infer():
                     wer_len = 1000
                 if wer_dist/wer_len > 0:
                     fw.write('uttid:\t{} \nres:\t{}\nref:\t{}\n\n'.format(sample['uttid'], res_txt, ref_txt))
-                logging.info('current cer: {:.3f}, wer: {:.3f};\tall cer {:.3f}, wer: {:.3f}'.format(
-                    cer_dist/cer_len, wer_dist/wer_len, total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
+                sys.stdout.write('\rcurrent cer: {:.3f}, wer: {:.3f};\tall cer {:.3f}, wer: {:.3f} {}/{} {:.2f}%'.format(
+                    cer_dist/cer_len, wer_dist/wer_len, total_cer_dist/total_cer_len,
+                    total_wer_dist/total_wer_len, i, len(dataset_dev), i/len(dataset_dev)*100))
+                sys.stdout.flush()
         logging.info('dev CER {:.3f}:  WER: {:.3f}'.format(total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
 
 
