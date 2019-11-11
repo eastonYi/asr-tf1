@@ -36,7 +36,7 @@ class Decoder(object):
         self.global_step = global_step
         self.start_warmup_steps = self.args.model.decoder.start_warmup_steps
 
-    def __call__(self, encoded, len_encoded, decoder_input):
+    def __call__(self, encoded, len_encoded, decoder_input, *args):
         '''
         Create the variables and do the forward computation to decode an entire
         sequence
@@ -49,7 +49,7 @@ class Decoder(object):
                 of [batch_size x ... ] tensors
         '''
         with tf.variable_scope(self.name or 'decoder'):
-            logits, preds, len_decode = self.decode(encoded, len_encoded, decoder_input)
+            logits, preds, len_decode = self.decode(encoded, len_encoded, decoder_input, *args)
 
         return logits, preds, len_decode
 

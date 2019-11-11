@@ -54,7 +54,7 @@ def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0,
         sys.stdout.write('\rbatch cer: {:.3f}\twer: {:.3f} batch: {}\t time:{:.2f}s {:.3f}%'.format(
                      _cer, _wer, shape_batch, used_time, progress*100.0))
         sys.stdout.flush()
-        
+
     used_time = time() - start_time
     cer = total_cer_dist/total_cer_len
     wer = total_wer_dist/total_wer_len
@@ -68,7 +68,7 @@ def decode_test(step, sample, model, sess, unit, idx2token, eos_idx=None, min_id
     # sample = dataset_dev[0]
     dict_feed = {model.list_pl[0]: np.expand_dims(sample['feature'], axis=0),
                  model.list_pl[1]: np.array([len(sample['feature'])])}
-    sampled_id, shape_sample, _ = sess.run(model.list_run, feed_dict=dict_feed)
+    sampled_id, shape_sample, len_logits = sess.run(model.list_run, feed_dict=dict_feed)
 
     res_txt = array2text(sampled_id[0], unit, idx2token, eos_idx, min_idx, max_idx)
     ref_txt = array2text(sample['label'], unit, idx2token, eos_idx, min_idx, max_idx)

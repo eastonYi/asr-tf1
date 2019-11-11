@@ -19,9 +19,10 @@ class CLM(LSTM_Model):
         self.args = args
         super().__init__(tensor_global_step, training, args, batch=None, name=name)
 
-    def __call__(self, inputs, len_decoded=None):
-        x = tf.layers.dense(inputs, units=self.dim_hidden, use_bias=False)
+    def __call__(self, inputs, len_inputs):
         len_x = self.max_input_len
+        inputs *= tf.sequence_mask(len_inputs, maxlen=len_x, dtype=tf.float32)[:, :, None]
+        x = tf.layers.dense(inputs, units=self.dim_hidden, use_bias=False)
         for i in range(self.num_blocks):
             inputs = x
             x = tf.layers.conv1d(x, filters=self.dim_hidden, kernel_size=3, strides=1, padding='same')
@@ -41,7 +42,8 @@ class CLM(LSTM_Model):
     def build_single_graph(self, id_gpu, name_gpu, tensors_input):
         with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
             inputs = tensors_input.feature_splits[id_gpu]
-            logits = self(inputs)
+            len_inputs = tensors_input.len_feat_splits[id_gpu]
+            logits = self(inputs, len_inputs)
             loss = tf.reduce_mean(logits)
 
             with tf.name_scope("gradients"):
@@ -68,22 +70,15 @@ class CLM(LSTM_Model):
 
         return tensors_input
 
-    def gradient_penalty(self, real, fake):
+    def gradient_penalty(self, real, fake, len_inputs):
 
-        def _interpolate(a, b):
-            batch_size = tf.shape(real)[0]
-            epsilon = tf.random_uniform(
-                shape=[batch_size, 1, 1], minval=0., maxval=1.)
-            interpolated = real + epsilon * (fake - real)
-
-            return interpolated
-
-        # assert real.shape == fake.shape
-        x = _interpolate(real, fake)
-        pred = self(x)
-        grad = tf.gradients(pred, x)
-        norm = tf.norm(tf.reshape(grad, [tf.shape(grad)[0], -1]), axis=1)
-        # norm = tf.sqrt(1e-8 + tf.reduce_sum(tf.square(grad), axis=[1, 2, 3]))
+        batch_size = tf.shape(real)[0]
+        epsilon = tf.random_uniform([batch_size, 1, 1], minval=0., maxval=1.)
+        interpolated = (1-epsilon) * real + epsilon * (fake - real)
+        pred = self(interpolated, len_inputs)
+        grad = tf.gradients(pred, interpolated)
+        # norm = tf.norm(tf.reshape(grad, [tf.shape(grad)[0], -1]), axis=1)
+        norm = tf.sqrt(1e-8 + tf.reduce_sum(tf.square(grad), axis=[1, 2, 3]))
         gp = tf.reduce_mean((norm - 1.)**2)
 
         return gp

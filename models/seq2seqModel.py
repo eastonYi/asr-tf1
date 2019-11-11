@@ -87,7 +87,7 @@ class Seq2SeqModel(LSTM_Model):
         if preds.get_shape().ndims == 3:
             preds = preds[:,:,0]
 
-        return preds, tensors_input.shape_batch, tf.no_op()
+        return preds, tensors_input.shape_batch, len_logits
 
     def ce_loss(self, logits, labels, len_labels):
         """

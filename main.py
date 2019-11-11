@@ -102,7 +102,7 @@ def train():
             batch_time = time()
             progress = num_processed/args.data.train_size
 
-            if global_step % 10 == 0:
+            if global_step % 50 == 0:
                 logging.info('loss: {:.3f}\tbatch: {} lr:{:.6f} time:{:.2f}s {:.3f}% step: {}'.format(
                               loss, shape_batch, lr, used_time, progress*100.0, global_step))
                 summary.summary_scalar('loss', loss, global_step)
@@ -110,6 +110,7 @@ def train():
 
             if global_step % args.save_step == args.save_step - 1:
                 saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step, write_meta_graph=True)
+                print('saved model in',  str(args.dir_checkpoint))
 
             if global_step % args.dev_step == args.dev_step -1:
                 cer, wer = dev(

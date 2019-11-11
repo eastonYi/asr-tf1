@@ -20,9 +20,10 @@ class CONV_LSTM(Encoder):
         # x = tf.expand_dims(features, -1)
         size_batch  = tf.shape(features)[0]
         size_length = tf.shape(features)[1]
-        size_feat = int(size_feat/3)
+        # size_feat = int(size_feat/3)
         len_feats = tf.reduce_sum(tf.cast(tf.reduce_sum(tf.abs(features), -1) > 0, tf.int32), -1)
-        x = tf.reshape(features, [size_batch, size_length, size_feat, 3])
+        # x = tf.reshape(features, [size_batch, size_length, size_feat, 3])
+        x = tf.reshape(features, [size_batch, size_length, size_feat, 1])
         # the first cnn layer
         x = self.normal_conv(
             inputs=x,

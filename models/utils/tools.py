@@ -186,7 +186,7 @@ def batch3D_pad_to(p, length, pad=0.0):
     pad_length = tf.reduce_max([length_p, length])-length_p
 
     pad = tf.cast(tf.fill(dims=[tf.shape(p)[0], pad_length, tf.shape(p)[-1]], value=pad), dtype=p.dtype)
-    res = tf.concat([p, pad], axis=1)
+    res = tf.concat([p, pad], axis=1)[:, :length, :]
 
     return res
 

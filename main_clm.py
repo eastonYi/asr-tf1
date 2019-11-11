@@ -5,12 +5,13 @@ import os
 import sys
 import logging
 import tensorflow as tf
+from pathlib import Path
 from tqdm import tqdm
 import numpy as np
 import editdistance as ed
 
 from models.utils.tools import get_session, create_embedding, size_variables
-from models.utils.tfData import TFReader, readTFRecord
+from models.utils.tfData import TFReader, readTFRecord, TFData
 from utils.arguments import args
 from utils.dataset import ASRDataLoader, TextDataSet
 from utils.summaryTools import Summary
@@ -24,8 +25,10 @@ def train():
     dataReader_train = TFReader(args.dirs.train.tfdata, args=args)
     batch_train = dataReader_train.fentch_batch_bucket()
     dataReader_untrain = TFReader(args.dirs.untrain.tfdata, args=args)
-    # batch_untrain = dataReader_untrain.fentch_batch_bucket()
-    batch_untrain = dataReader_untrain.fentch_batch(args.batch_size)
+    # batch_untrain = dataReader_untrain.fentch_batch(args.batch_size)
+    batch_untrain = dataReader_untrain.fentch_batch_bucket()
+    args.dirs.untrain.tfdata = Path(args.dirs.untrain.tfdata)
+    args.data.untrain_size = TFData.read_tfdata_info(args.dirs.untrain.tfdata)['size_dataset']
 
     dataset_text = TextDataSet(list_files=[args.dirs.text.data], args=args, _shuffle=True)
     tfdata_train = tf.data.Dataset.from_generator(
@@ -40,15 +43,16 @@ def train():
                                    batch_size=args.batch_size, num_loops=1)
 
     # tensor_global_step = tf.train.get_or_create_global_step()
-    tensor_global_step0 = tf.Variable(0, tf.int32)
-    tensor_global_step1 = tf.Variable(0, tf.int32)
-    tensor_global_step2 = tf.Variable(0, tf.int32)
+    tensor_global_step0 = tf.Variable(0, dtype=tf.int32, trainable=False)
+    tensor_global_step1 = tf.Variable(0, dtype=tf.int32, trainable=False)
+    tensor_global_step2 = tf.Variable(0, dtype=tf.int32, trainable=False)
 
     G = args.Model(
         tensor_global_step2,
         encoder=args.model.encoder.type,
         decoder=args.model.decoder.type,
         batch=batch_train,
+        # batch=batch_untrain,
         training=True,
         args=args)
 
@@ -68,6 +72,8 @@ def train():
 
     gan = args.GAN([tensor_global_step0, tensor_global_step1], G, D,
                    batch=batch_untrain, name='GAN', args=args)
+
+    size_variables()
 
     start_time = datetime.now()
     saver_G = tf.train.Saver(vars_G, max_to_keep=1)
@@ -94,14 +100,23 @@ def train():
             #     eos_idx=args.eos_idx,
             #     min_idx=0,
             #     max_idx=args.dim_output-1)
+            # decode_test(
+            #     step=0,
+            #     sample=args.dataset_test[10],
+            #     model=G_infer,
+            #     sess=sess,
+            #     unit=args.data.unit,
+            #     idx2token=args.idx2token,
+            #     eos_idx=None,
+            #     min_idx=0,
+            #     max_idx=None)
 
         batch_time = time()
         num_processed = 0
         progress = 0
         while progress < args.num_epochs:
 
-            global_step, lr_G, lr_D = sess.run([tensor_global_step0, gan.learning_rate_G, gan.learning_rate_D])
-            # import pdb; pdb.set_trace()
+            global_step, lr_G, lr_D = sess.run([tensor_global_step2, gan.learning_rate_G, gan.learning_rate_D])
 
             # untrain
             text = sess.run(iter_text)
@@ -112,28 +127,32 @@ def train():
             loss_D, _ = sess.run(gan.list_train_D,
                                  feed_dict={gan.list_pl[0]:text,
                                             gan.list_pl[1]:text_lens})
+            # loss_G = 0.0
+            # loss_D = 0.0
             # train
             # if global_step % 5 == 0:
-            loss_supervise, shape_batch, _, _ = sess.run(G.list_run)
+            for _ in range(1):
+                loss_supervise, shape_batch, _, _ = sess.run(G.list_run)
             # loss_supervise = 0
 
             num_processed += shape_feature[0]
             used_time = time()-batch_time
             batch_time = time()
-            progress = num_processed/args.data.train_size
+            progress = num_processed/args.data.untrain_size
 
-            if global_step % 1 == 0:
+            if global_step % 50 == 0:
                 logging.info('loss_supervise: {:.3f}, loss: {:.3f}|{:.3f}\tbatch: {}|{} lr:{:.6f}|{:.6f} time:{:.2f}s {:.3f}% step: {}'.format(
                               loss_supervise, loss_G, loss_D, shape_feature, shape_text, lr_G, lr_D, used_time, progress*100.0, global_step))
-                summary.summary_scalar('loss_G', loss_G, global_step)
-                summary.summary_scalar('loss_D', loss_D, global_step)
-                summary.summary_scalar('lr_G', lr_G, global_step)
-                summary.summary_scalar('lr_D', lr_D, global_step)
+                # summary.summary_scalar('loss_G', loss_G, global_step)
+                # summary.summary_scalar('loss_D', loss_D, global_step)
+                # summary.summary_scalar('lr_G', lr_G, global_step)
+                # summary.summary_scalar('lr_D', lr_D, global_step)
 
             if global_step % args.save_step == args.save_step - 1:
                 saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step, write_meta_graph=True)
 
             if global_step % args.dev_step == args.dev_step - 1:
+            # if global_step % args.dev_step == 0:
                 cer, wer = dev(
                     step=global_step,
                     dataloader=dataloader_dev,
@@ -144,8 +163,8 @@ def train():
                     eos_idx=args.eos_idx,
                     min_idx=0,
                     max_idx=args.dim_output-1)
-                summary.summary_scalar('dev_cer', cer, global_step)
-                summary.summary_scalar('dev_wer', wer, global_step)
+                # summary.summary_scalar('dev_cer', cer, global_step)
+                # summary.summary_scalar('dev_wer', wer, global_step)
 
             if global_step % args.decode_step == args.decode_step - 1:
                 decode_test(
