@@ -28,7 +28,8 @@ def residual(inputs, outputs, dropout_rate):
         A Tensor.
     """
     outputs = inputs + tf.nn.dropout(outputs, 1 - dropout_rate)
-    outputs = layer_norm(outputs)
+    # outputs = layer_norm(outputs)
+    outputs = tf.contrib.layers.layer_norm(outputs)
     return outputs
 
 

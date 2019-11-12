@@ -46,9 +46,9 @@ model_D:
     num_hidden: 512
     num_blocks: 5
 
-# lr_type: constant_learning_rate
+lr_type: constant_learning_rate
 optimizer: adam
-# lr: 0.00001
+lr: 0.00001
 warmup_steps: 2000
 peak: 0.0002
 decay_steps: 3000
@@ -61,10 +61,10 @@ decode_step: 600
 save_step: 600
 num_epochs: 999
 
-# gpus: '0,1,2,3'
+gpus: '0,1,2,3'
 # gpus: '0,1'
-gpus: '4,5,6,7'
-# gpus: '2,3'
+# gpus: '4,5,6,7'
+# gpus: '4,5'
 batch_size: 80
 beam_size: 1
 text_batch_size: 200

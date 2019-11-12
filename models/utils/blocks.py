@@ -5,8 +5,39 @@ from tensorflow.contrib.rnn import GRUCell, LayerNormBasicLSTMCell, DropoutWrapp
 allow_defun = True
 
 
-def single_cell(num_units, is_train, cell_type,
-                dropout=0.0, forget_bias=0.0, dim_project=None):
+def normal_conv(inputs, filter_num, kernel, stride, padding, use_relu, name,
+                w_initializer=None, norm_type="batch"):
+    with tf.variable_scope(name):
+        net = tf.layers.conv2d(inputs, filter_num, kernel, stride, padding,
+                           kernel_initializer=w_initializer, name="conv")
+        if norm_type == "batch":
+            net = tf.layers.batch_normalization(net, name="bn")
+        elif norm_type == "layer":
+            # net = layer_norm(net)
+            net = tf.contrib.layers.layer_norm(net)
+        else:
+            net = net
+        output = tf.nn.relu(net) if use_relu else net
+
+    return output
+
+
+def block(x, num_filters, i, kernel=(3,9)):
+    input = x
+    x = normal_conv(
+        inputs=x,
+        filter_num=num_filters,
+        kernel=kernel,
+        stride=(1,1),
+        padding='SAME',
+        use_relu=True,
+        name="res_"+str(i),
+        norm_type='layer')
+
+    return x+input
+
+
+def single_cell(num_units, is_train, cell_type, dropout=0.0, forget_bias=0.0, dim_project=None):
     """Create an instance of a single RNN cell."""
     # dropout (= 1 - keep_prob) is set to 0 during eval and infer
     dropout = dropout if is_train else 0.0
@@ -240,7 +271,7 @@ def dense_without_vars(inputs,
                 b = tf.get_variable("bias", [units], initializer=tf.zeros_initializer)
                 outputs += b
             outputs = activation(outputs)
-            
+
             return tf.reshape(outputs, inputs_shape[:-1] + [units])
         else:
             arg1 = dense_without_vars(inputs, units, tf.identity, use_bias, name='arg1')

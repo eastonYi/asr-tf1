@@ -74,4 +74,6 @@ def decode_test(step, sample, model, sess, unit, idx2token, eos_idx=None, min_id
     ref_txt = array2text(sample['label'], unit, idx2token, eos_idx, min_idx, max_idx)
 
     logging.warning('length: {}, res: \n{}\nref: \n{}'.format(
-                 shape_sample[1], res_txt, ref_txt))
+        shape_sample[1], res_txt, ref_txt))
+
+    return len_logits

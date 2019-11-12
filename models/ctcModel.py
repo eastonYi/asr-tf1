@@ -17,24 +17,25 @@ class CTCModel(Seq2SeqModel):
                  batch=None, name='CTC_Model'):
         super().__init__(tensor_global_step, encoder, decoder, training, args, batch, name)
 
-    def __call__(self, feature, len_features, labels=None, len_labels=None, shrink=False):
-        encoder = self.gen_encoder(
-            training=self.training,
-            args=self.args)
-        decoder = self.gen_decoder(
-            training=self.training,
-            global_step=self.global_step,
-            args=self.args)
+    def __call__(self, feature, len_features, labels=None, len_labels=None, shrink=False, reuse=False):
+        with tf.variable_scope(self.name, reuse=reuse):
+            encoder = self.gen_encoder(
+                training=self.training,
+                args=self.args)
+            decoder = self.gen_decoder(
+                training=self.training,
+                global_step=self.global_step,
+                args=self.args)
 
-        with tf.variable_scope(encoder.name or 'encoder'):
-            encoded, len_encoded = encoder(feature, len_features)
+            with tf.variable_scope(encoder.name or 'encoder'):
+                encoded, len_encoded = encoder(feature, len_features)
 
-        with tf.variable_scope(decoder.name or 'decoder'):
-            logits, align, len_logits = decoder(encoded, len_encoded, None, shrink)
+            with tf.variable_scope(decoder.name or 'decoder'):
+                logits, align, len_logits = decoder(encoded, len_encoded, None, shrink)
 
         return logits, align, len_logits
 
-    def build_single_graph(self, id_gpu, name_gpu, tensors_input):
+    def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
         feature = tensors_input.feature_splits[id_gpu]
         len_features = tensors_input.len_feat_splits[id_gpu]
         labels = tensors_input.label_splits[id_gpu] if tensors_input.label_splits else None
@@ -48,7 +49,8 @@ class CTCModel(Seq2SeqModel):
                 len_features,
                 labels,
                 len_labels,
-                shrink=False)
+                shrink=False,
+                reuse=reuse)
 
             if self.training:
                 loss = self.ctc_loss(
@@ -98,20 +100,19 @@ class CTCModel(Seq2SeqModel):
     def build_infer_graph(self):
         # cerate input tensors in the cpu
         tensors_input = self.build_infer_input()
-        with tf.variable_scope(self.name, reuse=bool(self.__class__.num_Model)):
-            logits, len_logits = self.build_single_graph(
-                id_gpu=0,
-                name_gpu=self.list_gpu_devices[0],
-                tensors_input=tensors_input)
+        logits, len_logits = self.build_single_graph(
+            id_gpu=0,
+            name_gpu=self.list_gpu_devices[0],
+            tensors_input=tensors_input)
 
-            decoded_sparse = self.ctc_decode(logits, len_logits)
-            decoded = tf.sparse_to_dense(
-                sparse_indices=decoded_sparse.indices,
-                output_shape=decoded_sparse.dense_shape,
-                sparse_values=decoded_sparse.values,
-                default_value=0,
-                validate_indices=True)
-            distribution = tf.nn.softmax(logits)
+        decoded_sparse = self.ctc_decode(logits, len_logits)
+        decoded = tf.sparse_to_dense(
+            sparse_indices=decoded_sparse.indices,
+            output_shape=decoded_sparse.dense_shape,
+            sparse_values=decoded_sparse.values,
+            default_value=0,
+            validate_indices=True)
+        distribution = tf.nn.softmax(logits)
 
         return decoded, tensors_input.shape_batch, distribution
 

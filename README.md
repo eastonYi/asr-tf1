@@ -8,6 +8,7 @@
 ## model code
 - `__call__`
 the forward compution of model and generate logits, which is then used in `build_single_graph` to compute loss and gradients.
+all the variavles in the model should be defined within 
 
 - `build_single_graph`
 process input and call the self to build forward graph, then compute loss and gradients.

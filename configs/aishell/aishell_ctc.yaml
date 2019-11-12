@@ -1,13 +1,13 @@
 dirs:
     exp: aishell
-    # train:
-    #     scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-10k.scp
-    #     trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-10k.phone67
-    #     tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-10k_xy
     train:
-        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
-        trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k.phone67
-        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-120k_xy
+        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-10k.scp
+        trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-10k.phone67
+        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-10k_xy
+    # train:
+    #     scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
+    #     trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k.phone67
+    #     tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-120k_xy
     dev:
         scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.dev-14k.scp
         trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/dev-14k.phone67
@@ -21,7 +21,7 @@ dirs:
     type: scp
     vocab: /mnt/lustre/xushuang2/easton/data/aishell/phone/phones_67+1.vocab
     # checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_conv_attention/resnet3_train-10k/checkpoint
-    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer/test2/checkpoint
+    checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc/merge_false_train-10k/checkpoint
 
 data:
     featType: mfcc
@@ -59,10 +59,10 @@ decode_step: 600
 save_step: 600
 num_epochs: 999
 
-gpus: '0,1,2,3'
+# gpus: '0,1,2,3'
 # gpus: '0,1'
 # gpus: '4,5,6,7'
-# gpus: '2,3'
+gpus: '4,5'
 batch_size: 80
 beam_size: 1
 text_batch_size: 200

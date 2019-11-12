@@ -123,10 +123,10 @@ def train():
             text_lens = get_batch_length(text)
             shape_feature = sess.run(gan.list_info[0])
             shape_text = text.shape
-            loss_G, _ = sess.run(gan.list_train_G)
             loss_D, _ = sess.run(gan.list_train_D,
                                  feed_dict={gan.list_pl[0]:text,
                                             gan.list_pl[1]:text_lens})
+            loss_G, _ = sess.run(gan.list_train_G)
             # loss_G = 0.0
             # loss_D = 0.0
             # train
@@ -167,6 +167,7 @@ def train():
                 # summary.summary_scalar('dev_wer', wer, global_step)
 
             if global_step % args.decode_step == args.decode_step - 1:
+            # if global_step:
                 decode_test(
                     step=global_step,
                     sample=args.dataset_test[10],

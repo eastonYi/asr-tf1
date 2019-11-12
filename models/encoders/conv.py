@@ -2,13 +2,9 @@
 contains the listener code'''
 
 import tensorflow as tf
-import numpy as np
+
 from .encoder import Encoder
-from tfModels.layers import residual, conv_lstm
-
-from tfModels.tensor2tensor.common_layers import layer_norm
-
-
+from ..utils.blocks import normal_conv, block
 # class CONV(Encoder):
 #     '''VERY DEEP CONVOLUTIONAL NETWORKS FOR END-TO-END SPEECH RECOGNITION
 #     '''
@@ -73,7 +69,7 @@ class CONV(Encoder):
         x = tf.reshape(features, [size_batch, size_length, size_feat, 1])
 
         for i in range(2):
-            x = self.normal_conv(
+            x = normal_conv(
                 inputs=x,
                 filter_num=num_filters,
                 kernel=(3,3),
@@ -86,7 +82,7 @@ class CONV(Encoder):
             len_feas = tf.cast(tf.ceil(tf.cast(len_feas, tf.float32)/2), tf.int32)
 
         for i in range(10):
-            x = self.block(x, num_filters, i)
+            x = block(x, num_filters, i)
 
         outputs = tf.reshape(x, [size_batch, size_length, num_filters*size_feat])
         outputs *= tf.sequence_mask(len_feas,
@@ -94,34 +90,3 @@ class CONV(Encoder):
                                     dtype=tf.float32)[:, : , None]
 
         return outputs, len_feas
-
-    @staticmethod
-    def normal_conv(inputs, filter_num, kernel, stride, padding, use_relu, name,
-                    w_initializer=None, norm_type="batch"):
-        with tf.variable_scope(name):
-            net = tf.layers.conv2d(inputs, filter_num, kernel, stride, padding,
-                               kernel_initializer=w_initializer, name="conv")
-            if norm_type == "batch":
-                net = tf.layers.batch_normalization(net, name="bn")
-            elif norm_type == "layer":
-                # net = layer_norm(net)
-                net = tf.contrib.layers.layer_norm(net)
-            else:
-                net = net
-            output = tf.nn.relu(net) if use_relu else net
-
-        return output
-
-    def block(self, x, num_filters, i):
-        input = x
-        x = self.normal_conv(
-            inputs=x,
-            filter_num=num_filters,
-            kernel=(3,9),
-            stride=(1,1),
-            padding='SAME',
-            use_relu=True,
-            name="res_"+str(i),
-            norm_type='layer')
-
-        return x+input

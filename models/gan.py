@@ -33,8 +33,8 @@ class GAN:
         loss_D_step = []; loss_G_step = []
         tower_D_grads = []; tower_G_grads = []
 
-        for id_gpu, name_gpu in enumerate(self.list_gpu_devices):
-            with tf.name_scope(self.name):
+        with tf.name_scope(self.name):
+            for id_gpu, name_gpu in enumerate(self.list_gpu_devices):
                 loss_D, loss_G, gradients_D, gradients_G = \
                     self.build_single_graph(id_gpu, name_gpu, tensors_input)
                 loss_D_step.append(loss_D); loss_G_step.append(loss_G)
@@ -47,11 +47,9 @@ class GAN:
             # computation relevant to gradient
             averaged_D_grads = average_gradients(tower_D_grads)
             handled_D_grads = handle_gradients(averaged_D_grads, self.args)
-            # with tf.variable_scope(tf.get_default_graph().get_name_scope(), reuse=True):
             op_optimize_D = self.optimizer_D.apply_gradients(handled_D_grads, self.global_step0)
             averaged_G_grads = average_gradients(tower_G_grads)
             handled_G_grads = handle_gradients(averaged_G_grads, self.args)
-            # with tf.variable_scope(tf.get_default_graph().get_name_scope(), reuse=True):
             op_optimize_G = self.optimizer_G.apply_gradients(handled_G_grads, self.global_step1)
 
         self.__class__.num_Instances += 1
@@ -71,8 +69,7 @@ class GAN:
 
         with tf.device(name_gpu):
             # G loss
-            with tf.variable_scope(self.G.name, reuse=True):
-                logits_G, preds, len_decoded = self.G(feature, len_features, shrink=True)
+            logits_G, preds, len_decoded = self.G(feature, len_features, shrink=True, reuse=True)
 
             # D loss fake
             with tf.variable_scope(self.D.name, reuse=True):
@@ -142,8 +139,8 @@ class GAN:
 
     def build_optimizer(self):
         if self.args.lr_type == 'constant_learning_rate':
-            self.learning_rate_G = tf.convert_to_tensor(self.args.lr)
-            self.learning_rate_D = tf.convert_to_tensor(self.args.lr)
+            self.learning_rate_G = tf.convert_to_tensor(self.args.lr_G)
+            self.learning_rate_D = tf.convert_to_tensor(self.args.lr_D)
         else:
             self.learning_rate_G = warmup_exponential_decay(
                 self.global_step0,
