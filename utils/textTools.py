@@ -3,6 +3,7 @@ import codecs
 import unicodedata
 import numpy as np
 import editdistance as ed
+from tqdm import tqdm
 
 
 # Constants
@@ -202,3 +203,91 @@ def sparse_tuple_from(sequences, dtype=np.int32):
 
     # return tf.SparseTensor(indices=indices, values=values, shape=shape)
     return indices, values, shape
+
+
+def get_N_gram(iterator, n):
+    """
+    return :
+        [(('ih', 'sil', 'k'), 1150),
+         (('ih', 'n', 'sil'), 1067),
+         ...],
+         num of all the n-gram, i.e. num of tokens
+    """
+    from nltk import ngrams, FreqDist
+
+    _n_grams = FreqDist(ngrams(iterator, n))
+
+    return _n_grams
+
+
+def get_dataset_ngram(text_file, n, k, savefile=None, split=5000):
+    """
+    Simply concatenate all sents into one will bring in noisy n-gram at end of each sent.
+    Here we count ngrams for each sent and sum them up.
+    """
+    from nltk import FreqDist
+
+    def iter_in_sent(sent):
+        for word in sent.split():
+            yield word
+
+    print('analysing text ...')
+
+    list_utterances = open(text_file).readlines()
+
+    ngrams_global = FreqDist()
+    for i in range(len(list_utterances)//split +1):
+        ngrams = FreqDist()
+        text = list_utterances[i*split: (i+1)*split]
+        for sent in tqdm(text):
+            ngram = get_N_gram(iter_in_sent(sent.strip()), n)
+            ngrams += ngram
+
+        ngrams_global += dict(ngrams.most_common(2*k))
+
+    if savefile:
+        with open(savefile, 'w') as fw:
+            for ngram,num in ngrams_global.most_common(k):
+                line = '{}:{}'.format(ngram,num)
+                fw.write(line+'\n')
+
+    return ngrams_global
+
+
+def read_ngram(top_k, file, token2idx, type='list'):
+    """
+    """
+    total_num = 0
+    ngram_py = []
+    with open(file) as f:
+        for _, line in zip(range(top_k), f):
+            ngram, num = line.strip().split(':')
+            ngram = tuple(token2idx[i[1:-1]] for i in ngram[1:-1].split(', '))
+            ngram_py.append((ngram, int(num)))
+            total_num += int(num)
+
+    if type == 'dict':
+        dict_ngram_py = {}
+        for ngram, num in ngram_py:
+            dict_ngram_py[ngram] = num/total_num
+
+        return dict_ngram_py
+
+    elif type == 'list':
+        list_ngram_py = []
+        for ngram, num in ngram_py:
+            list_ngram_py.append((ngram, num/total_num))
+
+        return list_ngram_py, total_num
+
+
+def ngram2kernel(ngram, n, k, dim_output):
+    kernel = np.zeros([n, dim_output, k], dtype=np.float32)
+    list_py = []
+    for i, (z, py) in enumerate(ngram):
+        list_py.append(py)
+        for j, token in enumerate(z):
+            kernel[j][token][i] = 1.0
+    py = np.array(list_py, dtype=np.float32)
+
+    return kernel, py

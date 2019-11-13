@@ -51,6 +51,7 @@ class GAN:
             averaged_G_grads = average_gradients(tower_G_grads)
             handled_G_grads = handle_gradients(averaged_G_grads, self.args)
             op_optimize_G = self.optimizer_G.apply_gradients(handled_G_grads, self.global_step1)
+            # op_optimize_G = self.G.optimizer.apply_gradients(handled_G_grads, self.global_step1)
 
         self.__class__.num_Instances += 1
         logging.info("built {} {} instance(s).".format(
@@ -72,33 +73,30 @@ class GAN:
             logits_G, preds, len_decoded = self.G(feature, len_features, shrink=True, reuse=True)
 
             # D loss fake
-            with tf.variable_scope(self.D.name, reuse=True):
-                logits_G = batch3D_pad_to(logits_G, length=self.args.max_label_len)
-                logits_D_res = self.D(logits_G, len_decoded-1)
-                loss_D_res = tf.reduce_mean(logits_D_res)
-                # zeros = tf.zeros(tf.shape(logits_D_res)[0], tf.float32)
-                # loss_D_res = tf.math.pow(logits_D_res - zeros, 2)
-                # loss_D_res = tf.reduce_mean(loss_D_res)
+            logits_G = batch3D_pad_to(logits_G, length=self.args.max_label_len)
+            logits_D_res = self.D(logits_G, len_decoded-1, reuse=True)
+            loss_D_res = tf.reduce_mean(logits_D_res)
+            # zeros = tf.zeros(tf.shape(logits_D_res)[0], tf.float32)
+            # loss_D_res = tf.math.pow(logits_D_res - zeros, 2)
+            # loss_D_res = tf.reduce_mean(loss_D_res)
 
             # D loss real
-            with tf.variable_scope(self.D.name, reuse=True):
-                feature_text = tf.one_hot(text, self.args.dim_output)
-                logits_D_text = self.D(feature_text, len_text)
-                loss_D_text = -tf.reduce_mean(logits_D_text)
-                # ones = tf.ones(tf.shape(logits_D_text)[0], tf.float32)
-                # loss_D_text = tf.math.pow(logits_D_text - ones, 2)
-                # loss_D_text = tf.reduce_mean(loss_D_text)
+            feature_text = tf.one_hot(text, self.args.dim_output)
+            logits_D_text = self.D(feature_text, len_text, reuse=True)
+            loss_D_text = -tf.reduce_mean(logits_D_text)
+            # ones = tf.ones(tf.shape(logits_D_text)[0], tf.float32)
+            # loss_D_text = tf.math.pow(logits_D_text - ones, 2)
+            # loss_D_text = tf.reduce_mean(loss_D_text)
 
             # D loss greadient penalty
-            with tf.variable_scope(self.D.name, reuse=True):
-                # idx = tf.random.uniform(
-                #     (), maxval=(self.args.text_batch_size-self.args.batch_size), dtype=tf.int32)
-                gp = self.D.gradient_penalty(
-                    # real=feature_text[idx:idx+4],
-                    real=feature_text[0:tf.shape(logits_G)[0]],
-                    fake=logits_G,
-                    len_inputs=len_decoded-1)
-                # gp = 0.0
+            # idx = tf.random.uniform(
+            #     (), maxval=(self.args.text_batch_size-self.args.batch_size), dtype=tf.int32)
+            gp = self.D.gradient_penalty(
+                # real=feature_text[idx:idx+4],
+                real=feature_text[0:tf.shape(logits_G)[0]],
+                fake=logits_G,
+                len_inputs=len_decoded-1)
+            # gp = 0.0
 
             loss_D = loss_D_text + loss_D_res + 10.0 * gp
             loss_G = -loss_D_res
@@ -138,22 +136,22 @@ class GAN:
         return tensors_input
 
     def build_optimizer(self):
-        if self.args.lr_type == 'constant_learning_rate':
-            self.learning_rate_G = tf.convert_to_tensor(self.args.lr_G)
-            self.learning_rate_D = tf.convert_to_tensor(self.args.lr_D)
-        else:
-            self.learning_rate_G = warmup_exponential_decay(
-                self.global_step0,
-                warmup_steps=self.args.warmup_steps,
-                peak=self.args.peak,
-                decay_rate=0.5,
-                decay_steps=self.args.decay_steps)
-            self.learning_rate_D = warmup_exponential_decay(
-                self.global_step1,
-                warmup_steps=self.args.warmup_steps,
-                peak=self.args.peak,
-                decay_rate=0.5,
-                decay_steps=self.args.decay_steps)
+        # if self.args.lr_type == 'constant_learning_rate':
+        self.learning_rate_G = tf.convert_to_tensor(self.args.lr_G)
+        self.learning_rate_D = tf.convert_to_tensor(self.args.lr_D)
+        # else:
+        #     self.learning_rate_G = warmup_exponential_decay(
+        #         self.global_step0,
+        #         warmup_steps=self.args.warmup_steps,
+        #         peak=self.args.peak,
+        #         decay_rate=0.5,
+        #         decay_steps=self.args.decay_steps)
+        #     self.learning_rate_D = warmup_exponential_decay(
+        #         self.global_step1,
+        #         warmup_steps=self.args.warmup_steps,
+        #         peak=self.args.peak,
+        #         decay_rate=0.5,
+        #         decay_steps=self.args.decay_steps)
 
         self.optimizer_D = tf.train.AdamOptimizer(self.learning_rate_D,
                                                   beta1=0.9,

@@ -13,11 +13,10 @@ import editdistance as ed
 from models.utils.tools import get_session, create_embedding, size_variables
 from models.utils.tfData import TFReader, readTFRecord, TFData
 from utils.arguments import args
-from utils.dataset import ASRDataLoader, TextDataSet
+from utils.dataset import ASRDataLoader
 from utils.summaryTools import Summary
 from utils.performanceTools import dev, decode_test
-from utils.textTools import array_idx2char, array2text
-from utils.tools import get_batch_length
+from utils.textTools import array_idx2char, array2text, read_ngram, ngram2kernel, get_dataset_ngram
 
 
 def train():
@@ -30,48 +29,35 @@ def train():
     args.dirs.untrain.tfdata = Path(args.dirs.untrain.tfdata)
     args.data.untrain_size = TFData.read_tfdata_info(args.dirs.untrain.tfdata)['size_dataset']
 
-    dataset_text = TextDataSet(list_files=[args.dirs.text.data], args=args, _shuffle=True)
-    tfdata_train = tf.data.Dataset.from_generator(
-        dataset_text, (tf.int32), (tf.TensorShape([None])))
-    iter_text = tfdata_train.cache().repeat().shuffle(1000).\
-        padded_batch(args.text_batch_size, ([args.max_label_len])).prefetch(buffer_size=5).\
-        make_one_shot_iterator().get_next()
-
     feat, label = readTFRecord(args.dirs.dev.tfdata, args,
                                _shuffle=False, transform=True)
     dataloader_dev = ASRDataLoader(args.dataset_dev, args, feat, label,
                                    batch_size=args.batch_size, num_loops=1)
 
-    # tensor_global_step = tf.train.get_or_create_global_step()
-    tensor_global_step0 = tf.Variable(0, dtype=tf.int32, trainable=False)
-    tensor_global_step1 = tf.Variable(0, dtype=tf.int32, trainable=False)
-    tensor_global_step2 = tf.Variable(0, dtype=tf.int32, trainable=False)
+    tensor_global_step = tf.train.get_or_create_global_step()
+
+    # get dataset ngram
+    ngram_py, total_num = read_ngram(args.EODM.top_k, args.dirs.text.ngram, args.token2idx, type='list')
+    kernel, py = ngram2kernel(ngram_py, args.EODM.ngram, args.EODM.top_k, args.dim_output)
 
     G = args.Model(
-        tensor_global_step2,
+        tensor_global_step,
         encoder=args.model.encoder.type,
         decoder=args.model.decoder.type,
+        kernel=kernel,
+        py=py,
         batch=batch_train,
-        # batch=batch_untrain,
+        unbatch=batch_untrain,
         training=True,
         args=args)
 
     G_infer = args.Model(
-        tensor_global_step2,
+        tensor_global_step,
         encoder=args.model.encoder.type,
         decoder=args.model.decoder.type,
         training=False,
         args=args)
     vars_G = G.variables()
-
-    D = args.Model_D(
-        tensor_global_step0,
-        training=True,
-        name='discriminator',
-        args=args)
-
-    gan = args.GAN([tensor_global_step0, tensor_global_step1], G, D,
-                   batch=batch_untrain, name='GAN', args=args)
 
     size_variables()
 
@@ -113,36 +99,25 @@ def train():
 
         batch_time = time()
         num_processed = 0
+        num_processed_unbatch = 0
         progress = 0
+        progress_unbatch = 0
         while progress < args.num_epochs:
 
-            global_step, lr, lr_G, lr_D = sess.run([tensor_global_step2, G.learning_rate, gan.learning_rate_G, gan.learning_rate_D])
+            global_step, lr = sess.run([tensor_global_step, G.learning_rate])
 
-            # untrain
-            text = sess.run(iter_text)
-            text_lens = get_batch_length(text)
-            shape_feature = sess.run(gan.list_info[0])
-            shape_text = text.shape
-            loss_D, _ = sess.run(gan.list_train_D,
-                                 feed_dict={gan.list_pl[0]:text,
-                                            gan.list_pl[1]:text_lens})
-            loss_G, _ = sess.run(gan.list_train_G)
-            # loss_G = 0.0
-            # loss_D = 0.0
-            # train
-            # if global_step % 5 == 0:
-            for _ in range(1):
-                loss_supervise, shape_batch, _, _ = sess.run(G.list_run)
-            # loss_supervise = 0
-
-            num_processed += shape_feature[0]
+            loss_CTC, shape_batch, _ = sess.run(G.list_run)
+            loss_EODM, shape_unbatch, _ = sess.run(G.list_run_EODM)
+            num_processed += shape_batch[0]
+            num_processed_unbatch += shape_unbatch[0]
             used_time = time()-batch_time
             batch_time = time()
             progress = num_processed/args.data.untrain_size
+            progress_unbatch = num_processed/args.data.untrain_size
 
             if global_step % 50 == 0:
-                logging.info('loss_supervise: {:.2f}, loss: {:.1f}|{:.1f}\tbatch: {}|{} lr:{:.6f} {:.6f}|{:.6f} time:{:.2f}s {:.3f}% step: {}'.format(
-                              loss_supervise, loss_G, loss_D, shape_feature, shape_text, lr, lr_G, lr_D, used_time, progress*100.0, global_step))
+                logging.info('loss: {:.2f}|{:.2f}\tbatch: {} lr:{:.6f} time:{:.2f}s {:.2f}% {:.2f}% step: {}'.format(
+                              loss_CTC, loss_EODM, shape_batch, lr, used_time, progress*100.0, progress_unbatch*100.0, global_step))
                 # summary.summary_scalar('loss_G', loss_G, global_step)
                 # summary.summary_scalar('loss_D', loss_D, global_step)
                 # summary.summary_scalar('lr_G', lr_G, global_step)
@@ -404,5 +379,8 @@ if __name__ == '__main__':
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
         logging.info('enter the TRAINING phrase')
         train()
+
+    elif param.mode == 'ngram':
+        get_dataset_ngram(args.dirs.text.data, args.EODM.ngram, args.EODM.top_k, savefile=args.dirs.text.ngram, split=5000)
 
         # python ../../main.py -m save --gpu 1 --name kin_asr -c configs/rna_char_big3.yaml

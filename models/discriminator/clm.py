@@ -66,69 +66,70 @@ class CLM(LSTM_Model):
 
         return logits
 
-    # def __call__(self, features, len_features):
+    # def __call__(self, features, len_features, reuse=False):
     #     self.attention_dropout_rate = 0.1
     #     self.residual_dropout_rate = 0.1
     #     self.num_heads = 8
     #     self._ff_activation = lambda x, y: x * tf.sigmoid(y)
     #
-    #     encoder_output = tf.layers.dense(
-    #         inputs=features,
-    #         units=self.dim_hidden,
-    #         activation=None,
-    #         use_bias=False,
-    #         name='clm_fc')
-    #     encoder_output = tf.contrib.layers.layer_norm(
-    #         encoder_output, center=True, scale=True, trainable=True)
+    #     with tf.variable_scope(self.name, reuse=reuse):
+    #         encoder_output = tf.layers.dense(
+    #             inputs=features,
+    #             units=self.dim_hidden,
+    #             activation=None,
+    #             use_bias=False,
+    #             name='clm_fc')
+    #         encoder_output = tf.contrib.layers.layer_norm(
+    #             encoder_output, center=True, scale=True, trainable=True)
     #
-    #     # Add positional signal
-    #     encoder_output = add_timing_signal_1d(encoder_output)
-    #     # Dropout
-    #     encoder_output = tf.layers.dropout(encoder_output,
-    #                                        rate=self.residual_dropout_rate,
-    #                                        training=self.training)
-    #     # Mask
-    #     encoder_padding = tf.equal(tf.sequence_mask(len_features, maxlen=tf.shape(features)[1]), False) # bool tensor
-    #     encoder_attention_bias = attention_bias_ignore_padding(encoder_padding)
+    #         # Add positional signal
+    #         encoder_output = add_timing_signal_1d(encoder_output)
+    #         # Dropout
+    #         encoder_output = tf.layers.dropout(encoder_output,
+    #                                            rate=self.residual_dropout_rate,
+    #                                            training=self.training)
+    #         # Mask
+    #         encoder_padding = tf.equal(tf.sequence_mask(len_features, maxlen=tf.shape(features)[1]), False) # bool tensor
+    #         encoder_attention_bias = attention_bias_ignore_padding(encoder_padding)
     #
-    #     # Blocks
-    #     for i in range(self.num_blocks):
-    #         with tf.variable_scope("block_{}".format(i)):
-    #             # Multihead Attention
-    #             encoder_output = residual(encoder_output,
-    #                                       multihead_attention(
-    #                                           query_antecedent=encoder_output,
-    #                                           memory_antecedent=None,
-    #                                           bias=encoder_attention_bias,
-    #                                           total_key_depth=self.dim_hidden,
-    #                                           total_value_depth=self.dim_hidden,
-    #                                           output_depth=self.dim_hidden,
-    #                                           num_heads=self.num_heads,
-    #                                           dropout_rate=self.attention_dropout_rate,
-    #                                           name='clm_self_attention',
-    #                                           summaries=False),
-    #                                       dropout_rate=self.residual_dropout_rate)
+    #         # Blocks
+    #         for i in range(self.num_blocks):
+    #             with tf.variable_scope("block_{}".format(i)):
+    #                 # Multihead Attention
+    #                 encoder_output = residual(encoder_output,
+    #                                           multihead_attention(
+    #                                               query_antecedent=encoder_output,
+    #                                               memory_antecedent=None,
+    #                                               bias=encoder_attention_bias,
+    #                                               total_key_depth=self.dim_hidden,
+    #                                               total_value_depth=self.dim_hidden,
+    #                                               output_depth=self.dim_hidden,
+    #                                               num_heads=self.num_heads,
+    #                                               dropout_rate=self.attention_dropout_rate,
+    #                                               name='clm_self_attention',
+    #                                               summaries=False),
+    #                                           dropout_rate=self.residual_dropout_rate)
     #
-    #             # Feed Forward
-    #             encoder_output = residual(encoder_output,
-    #                                       ff_hidden(
-    #                                           inputs=encoder_output,
-    #                                           hidden_size=4 * self.dim_hidden,
-    #                                           output_size=self.dim_hidden,
-    #                                           activation=self._ff_activation),
-    #                                       dropout_rate=self.residual_dropout_rate)
-    #     # Mask padding part to zeros.
-    #     encoder_output *= tf.expand_dims(1.0 - tf.to_float(encoder_padding), axis=-1)
-    #     encoder_output = tf.reduce_sum(encoder_output, 1) / tf.cast(len_features, tf.float32)[:, None]
-    #     logits = tf.layers.dense(encoder_output, units=1, use_bias=False)
+    #                 # Feed Forward
+    #                 encoder_output = residual(encoder_output,
+    #                                           ff_hidden(
+    #                                               inputs=encoder_output,
+    #                                               hidden_size=4 * self.dim_hidden,
+    #                                               output_size=self.dim_hidden,
+    #                                               activation=self._ff_activation),
+    #                                           dropout_rate=self.residual_dropout_rate)
+    #         # Mask padding part to zeros.
+    #         encoder_output *= tf.expand_dims(1.0 - tf.to_float(encoder_padding), axis=-1)
+    #         encoder_output = tf.reduce_sum(encoder_output, 1) / tf.cast(len_features, tf.float32)[:, None]
+    #         logits = tf.layers.dense(encoder_output, units=1, use_bias=False)
     #
     #     return logits
 
-    def build_single_graph(self, id_gpu, name_gpu, tensors_input):
+    def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
         with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
             inputs = tensors_input.feature_splits[id_gpu]
             len_inputs = tensors_input.len_feat_splits[id_gpu]
-            logits = self(inputs, len_inputs)
+            logits = self(inputs, len_inputs, reuse=reuse)
             loss = tf.reduce_mean(logits)
 
             with tf.name_scope("gradients"):
@@ -160,7 +161,7 @@ class CLM(LSTM_Model):
         batch_size = tf.shape(real)[0]
         epsilon = tf.random_uniform([batch_size, 1, 1], minval=0., maxval=1.)
         interpolated = (1-epsilon) * real + epsilon * (fake - real)
-        pred = self(interpolated, len_inputs)
+        pred = self(interpolated, len_inputs, reuse=True)
         grad = tf.gradients(pred, interpolated)
         # norm = tf.norm(tf.reshape(grad, [tf.shape(grad)[0], -1]), axis=1)
         norm = tf.sqrt(1e-8 + tf.reduce_sum(tf.square(grad), axis=[1, 2, 3]))

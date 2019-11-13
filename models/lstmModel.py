@@ -23,9 +23,7 @@ class LSTM_Model(object):
         self.batch = batch
         self.name = name
         self.build_input = self.build_tf_input if batch else self.build_pl_input
-
         self.list_pl = None
-
         self.global_step = tensor_global_step
 
         # Build graph

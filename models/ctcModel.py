@@ -17,7 +17,7 @@ class CTCModel(Seq2SeqModel):
                  batch=None, name='CTC_Model'):
         super().__init__(tensor_global_step, encoder, decoder, training, args, batch, name)
 
-    def __call__(self, feature, len_features, labels=None, len_labels=None, shrink=False, reuse=False):
+    def __call__(self, feature, len_features, shrink=False, reuse=False):
         with tf.variable_scope(self.name, reuse=reuse):
             encoder = self.gen_encoder(
                 training=self.training,
@@ -47,8 +47,6 @@ class CTCModel(Seq2SeqModel):
             logits, align, len_logits = self(
                 feature,
                 len_features,
-                labels,
-                len_labels,
                 shrink=False,
                 reuse=reuse)
 

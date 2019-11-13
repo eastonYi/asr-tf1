@@ -33,7 +33,7 @@ class Seq2SeqModel(LSTM_Model):
 
         super().__init__(tensor_global_step, training, args, batch=batch, name=name)
 
-    def build_single_graph(self, id_gpu, name_gpu, tensors_input):
+    def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
 
         with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
             encoder = self.gen_encoder(
@@ -78,11 +78,10 @@ class Seq2SeqModel(LSTM_Model):
     def build_infer_graph(self):
         tensors_input = self.build_infer_input()
 
-        with tf.variable_scope(self.name, reuse=bool(self.__class__.num_Model)):
-            logits, len_logits, preds = self.build_single_graph(
-                id_gpu=0,
-                name_gpu=self.list_gpu_devices[0],
-                tensors_input=tensors_input)
+        logits, len_logits, preds = self.build_single_graph(
+            id_gpu=0,
+            name_gpu=self.list_gpu_devices[0],
+            tensors_input=tensors_input)
 
         if preds.get_shape().ndims == 3:
             preds = preds[:,:,0]

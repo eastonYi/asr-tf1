@@ -18,10 +18,11 @@ dirs:
         tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/test-7k_xy
     text:
         data: /mnt/lustre/xushuang2/easton/data/aishell/phone/text-120k.phone67
+        ngram: /mnt/lustre/xushuang2/easton/data/aishell/phone/text-120k.5gram
     type: scp
     vocab: /mnt/lustre/xushuang2/easton/data/aishell/phone/phones_67+1.vocab
     checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc/merge_false_train-10k/checkpoint
-    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer/test2/checkpoint
+    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc/merge_false_train-10k/checkpoint
 
 data:
     featType: mfcc
@@ -31,24 +32,22 @@ data:
     add_delta: False
     unit: word
 
+EODM:
+    ngram: 5
+    top_k: 1000
+    k: 1000
+
 model:
-    type: ctcModel
+    type: ctcModel_EODM
     encoder:
         type: conv
         num_filters: 128
     decoder:
         type: FC
 
-model_D:
-    type: clm
-    num_hidden: 512
-    num_blocks: 5
-
-# lr_type: constant_learning_rate
+lr_type: constant_learning_rate
 optimizer: adam
-# lr: 0.0001
-lr_G: 0.00001
-lr_D: 0.00001
+lr: 0.00001
 warmup_steps: 2000
 peak: 0.0002
 decay_steps: 3000
@@ -61,10 +60,10 @@ decode_step: 600
 save_step: 600
 num_epochs: 999
 
-# gpus: '0,1,2,3'
+gpus: '0,1,2,3'
 # gpus: '0,1'
 # gpus: '4,5,6,7'
-gpus: '6,7'
+# gpus: '4,5'
 batch_size: 80
 beam_size: 1
 text_batch_size: 200

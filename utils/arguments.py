@@ -172,6 +172,8 @@ if args.model.type == 'Seq2SeqModel':
     from models.seq2seqModel import Seq2SeqModel as Model
 elif args.model.type == 'ctcModel':
     from models.ctcModel import CTCModel as Model
+elif args.model.type == 'ctcModel_EODM':
+    from models.ctcModel_EODM import CTCModel as Model
 elif args.model.type == 'classifier':
     from models.classifier import Classifier as Model
 elif args.model.type == 'transformer':
