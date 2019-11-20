@@ -11,7 +11,7 @@ class Generator():
     num_Instances = 0
     num_Model = 0
     def __init__(self, tensor_global_step, hidden, num_blocks, args, name='Gerneral_Generator_Model'):
-        self.batch_size = args.text_batch_size
+        self.batch_size = int(args.text_batch_size/args.num_gpus)
         self.max_input_len = args.max_label_len
         self.dim_hidden = hidden
         self.num_blocks = num_blocks
@@ -20,12 +20,12 @@ class Generator():
         self.num_gpus = args.num_gpus
         self.list_gpu_devices = args.list_gpus
         self.center_device = "/cpu:0"
-        self.build_graph()
+        self.run_list = self.build_graph()
         self.trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
 
     def __call__(self, reuse=False):
         with tf.variable_scope(self.name, reuse=reuse):
-            inputs = tf.random_normal([self.batch_size, self.max_input_len])
+            inputs = tf.random_normal([int(self.batch_size), self.max_input_len])
             x = tf.layers.dense(inputs, units=self.max_input_len * self.dim_hidden, use_bias=False)
             x = tf.reshape(x, [self.batch_size, self.max_input_len, self.dim_hidden])
             for i in range(self.num_blocks):
@@ -52,10 +52,7 @@ class Generator():
         return logits, len_logits
 
     def build_graph(self):
+        logits, len_logits = self.build_single_graph(0, self.list_gpu_devices[0])
+        decoded = tf.argmax(logits, -1)
 
-        for id_gpu, name_gpu in enumerate(self.list_gpu_devices):
-            self.build_single_graph(id_gpu, name_gpu)
-
-        self.__class__.num_Instances += 1
-        logging.info("built {} {} instance(s).".format(
-            self.__class__.num_Instances, self.__class__.__name__))
+        return decoded, len_logits

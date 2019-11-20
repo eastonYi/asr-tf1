@@ -49,12 +49,12 @@ model:
     decoder:
         type: FC
 
-# lr_type: constant_learning_rate
+lr_type: constant_learning_rate
 optimizer: adam
 lr: 0.00001
-warmup_steps: 2000
-peak: 0.0002
-decay_steps: 3000
+# warmup_steps: 2000
+# peak: 0.0002
+# decay_steps: 3000
 # warmup_steps: 600
 # peak: 0.0002
 # decay_steps: 1000
@@ -72,7 +72,8 @@ batch_size: 100
 text_batch_size: 1
 beam_size: 1
 num_batch_tokens: 160000
-bucket_boundaries: 403,432,465,500,537,578,629,706,905,1230
+# bucket_boundaries: 403,432,465,500,537,578,629,706,905,1230
+bucket_boundaries: 343,403,465,537,629,905,1230
 
 lambda_lm: 0.0
 grad_clip_value: 10.0

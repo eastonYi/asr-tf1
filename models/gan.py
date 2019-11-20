@@ -263,3 +263,138 @@ class GAN:
         #                                           name='optimizer_G')
         self.optimizer_G = tf.train.RMSPropOptimizer(self.learning_rate_G)
         self.optimizer_D = tf.train.RMSPropOptimizer(self.learning_rate_D)
+
+
+class Random_GAN(GAN):
+
+    def build_graph(self):
+        self.build_optimizer()
+        tensors_input = self.build_input()
+
+        loss_D_step = []; loss_G_step = [];
+        tower_D_grads = []; tower_G_grads = []
+
+        with tf.name_scope(self.name):
+            for id_gpu, name_gpu in enumerate(self.list_gpu_devices):
+                loss_D, loss_G, gradients_D, gradients_G, (loss_D_res, loss_D_text, loss_gp) = \
+                    self.build_single_graph(id_gpu, name_gpu, tensors_input)
+                loss_D_step.append(loss_D); loss_G_step.append(loss_G)
+                tower_D_grads.append(gradients_D); tower_G_grads.append(gradients_G)
+
+        # mean the loss
+        loss_D = tf.reduce_mean(loss_D_step); loss_G = tf.reduce_mean(loss_G_step)
+        # merge gradients, update current model
+        with tf.device(self.center_device):
+            # computation relevant to gradient
+            averaged_D_grads = average_gradients(tower_D_grads)
+            handled_D_grads = handle_gradients(averaged_D_grads, self.args)
+            op_optimize_D = self.optimizer_D.apply_gradients(handled_D_grads, self.global_step0)
+            averaged_G_grads = average_gradients(tower_G_grads)
+            handled_G_grads = handle_gradients(averaged_G_grads, self.args)
+            op_optimize_G = self.optimizer_G.apply_gradients(handled_G_grads, self.global_step1)
+
+        self.__class__.num_Instances += 1
+        logging.info("built {} {} instance(s).".format(
+            self.__class__.num_Instances, self.__class__.__name__))
+
+        return (loss_D, loss_D_res, loss_D_text, loss_gp, op_optimize_D), (loss_G, op_optimize_G), tf.no_op()
+
+    def build_single_graph(self, id_gpu, name_gpu, tensors_input):
+
+        text = tensors_input.text_splits[id_gpu]
+        len_text = tensors_input.len_text_splits[id_gpu]
+
+        with tf.device(name_gpu):
+            # G loss
+            # loss_G_supervise = tf.constant(0.0)
+            logits_G_un, len_decoded = self.G(reuse=True)
+
+            # D loss fake
+            logits_G_un = batch3D_pad_to(logits_G_un, length=self.args.max_label_len)
+            logits_D_res = self.D(tf.nn.softmax(logits_G_un, -1), len_decoded, reuse=True)
+            loss_D_res = tf.reduce_mean(logits_D_res, 0)
+
+            # D loss real
+            feature_text = tf.one_hot(text, self.args.dim_output)
+            logits_D_text = self.D(feature_text, len_text, reuse=True)
+            loss_D_text = -tf.reduce_mean(logits_D_text, 0)
+
+            gp = 10.0 * self.D.gradient_penalty(
+                # real=feature_text[idx:idx+4],
+                real=feature_text,
+                fake=tf.nn.softmax(logits_G_un, -1),
+                len_inputs=len_decoded)
+            # gp = tf.constant(0.0)
+
+            # loss_D_res = tf.constant(0.0)
+            loss_D = loss_D_res + loss_D_text +  gp
+            # loss_D = loss_D_res
+            loss_G = -loss_D_res
+            # loss_D = loss_D_res + loss_D_text
+            # loss_G = loss_G_res
+            # loss_G = 0
+
+            with tf.name_scope("gradients"):
+                gradients_D = self.optimizer_D.compute_gradients(
+                    loss_D, var_list=self.D.trainable_variables)
+                gradients_G = self.optimizer_G.compute_gradients(
+                    loss_G, var_list=self.G.trainable_variables)
+
+        self.__class__.num_Model += 1
+        logging.info('\tbuild {} on {} succesfully! total model number: {}'.format(
+            self.__class__.__name__, name_gpu, self.__class__.num_Model))
+
+        return loss_D, loss_G, gradients_D, gradients_G, [loss_D_res, loss_D_text, gp]
+
+
+    def build_input(self):
+        """
+        stand training input
+        only use feature rather label in GAN training
+        """
+        tensors_input = namedtuple('tensors_input',
+            'feature_splits, len_feat_splits, text_splits, len_text_splits, shape_batch')
+
+        with tf.device(self.center_device), tf.name_scope("GAN_inputs"):
+            batch_text = tf.placeholder(tf.int32, [None, None], name='input_text')
+            batch_text_lens = tf.placeholder(tf.int32, [None], name='input_len_text')
+            self.list_pl = [batch_text, batch_text_lens]
+
+            tensors_input.text_splits = tf.split(batch_text, self.num_gpus, name="text_splits")
+            tensors_input.len_text_splits = tf.split(batch_text_lens, self.num_gpus, name="len_text_splits")
+
+        return tensors_input
+
+    def build_optimizer(self):
+        # if self.args.lr_type == 'constant_learning_rate':
+        self.learning_rate_G = tf.convert_to_tensor(self.args.lr_G)
+        self.learning_rate_D = tf.convert_to_tensor(self.args.lr_D)
+        # self.optimizer_G = tf.train.GradientDescentOptimizer(self.learning_rate_G)
+        # self.optimizer_D = tf.train.GradientDescentOptimizer(self.learning_rate_D)
+        # else:
+        # self.learning_rate_G = warmup_exponential_decay(
+        #     self.global_step0,
+        #     warmup_steps=self.args.warmup_steps,
+        #     peak=self.args.peak,
+        #     decay_rate=0.5,
+        #     decay_steps=self.args.decay_steps)
+        #     self.learning_rate_D = warmup_exponential_decay(
+        #         self.global_step1,
+        #         warmup_steps=self.args.warmup_steps,
+        #         peak=self.args.peak,
+        #         decay_rate=0.5,
+        #         decay_steps=self.args.decay_steps)
+
+        # self.optimizer_D = tf.train.AdamOptimizer(self.learning_rate_D,
+        #                                           beta1=0.5,
+        #                                           beta2=0.9,
+        #                                           epsilon=1e-9,
+        #                                           name='optimizer_D')
+
+        # self.optimizer_G = tf.train.AdamOptimizer(self.learning_rate_G,
+        #                                           beta1=0.5,
+        #                                           beta2=0.9,
+        #                                           epsilon=1e-9,
+        #                                           name='optimizer_G')
+        self.optimizer_G = tf.train.RMSPropOptimizer(self.learning_rate_G)
+        self.optimizer_D = tf.train.RMSPropOptimizer(self.learning_rate_D)

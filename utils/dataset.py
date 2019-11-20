@@ -730,7 +730,7 @@ class DataLoader(SimpleDataLoader):
         super().__init__(dataset, num_loops)
         self.args = args
         self.num_thread = num_thread
-        self.num_batch_token = args.num_batch_token
+        self.num_batch_tokens = args.num_batch_tokens
         self.bucket_boundaries = args.bucket_boundaries
         self.list_batch_size = args.list_infer_batch_size if args.list_infer_batch_size else args.list_batch_size
 

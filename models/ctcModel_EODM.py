@@ -16,8 +16,6 @@ class CTCModel(CTCModel):
     '''
     def __init__(self, tensor_global_step, encoder, decoder, training, args,
                  kernel=None, py=None, batch=None, unbatch=None, name='CTC_Model'):
-        self.top_k = args.top_k
-        self.ngram = args.ngram
         self.kernel = kernel
         self.py = py
         self.unbatch = unbatch
