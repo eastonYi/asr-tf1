@@ -61,7 +61,7 @@ class CTCModel(CTCModel):
 
         return logits, align, len_logits
 
-    def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
+    def build_single_graph(self, id_gpu, name_gpu, tensors_input, shrink=False, reuse=tf.AUTO_REUSE):
         feature = tensors_input.feature_splits[id_gpu]
         len_features = tensors_input.len_feat_splits[id_gpu]
 
@@ -71,7 +71,7 @@ class CTCModel(CTCModel):
             logits, align, len_logits = self(
                 feature,
                 len_features,
-                shrink=False,
+                shrink=shrink,
                 reuse=reuse)
 
             if self.training:
@@ -91,9 +91,9 @@ class CTCModel(CTCModel):
                 unlogits, unalign, len_unlogits = self(
                     unfeature,
                     len_unfeatures,
-                    shrink=False,
+                    shrink=True,
                     reuse=reuse)
-                px_batch = tf.nn.softmax(logits)
+                px_batch = tf.nn.softmax(unlogits)
                 x_log = tf.math.log(px_batch + 1e-15)
                 x_conv = tf.layers.conv1d(x_log,
                                           filters=self.args.EODM.top_k,
@@ -106,7 +106,7 @@ class CTCModel(CTCModel):
                                           reuse=(id_gpu!=0))
 
                 pz = tf.exp(x_conv)
-                mask = tf.sequence_mask(len_logits, maxlen=tf.shape(pz)[1], dtype=tf.float32)[:, :, None]
+                mask = tf.sequence_mask(len_unlogits, maxlen=tf.shape(pz)[1], dtype=tf.float32)[:, :, None]
                 pz = tf.reduce_sum(pz * mask, [0, 1]) / tf.reduce_sum(mask, [0, 1]) # [z]
                 loss_z = - tf.convert_to_tensor(self.py) * tf.math.log(pz+1e-15) # batch loss
                 loss_EODM = tf.reduce_sum(loss_z)
@@ -122,7 +122,7 @@ class CTCModel(CTCModel):
         if self.training:
             return (loss_CTC, loss_EODM), (gradients_CTC, gradients_EODM), [loss_CTC, loss_EODM]
         else:
-            return logits, len_logits
+            return logits, align, len_logits
 
     def build_graph(self):
         # cerate input tensors in the cpu

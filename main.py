@@ -188,6 +188,7 @@ def infer():
                 cer_len = len(list_ref_char)
                 wer_dist = ed.eval(list_res_word, list_ref_word)
                 wer_len = len(list_ref_word)
+                res_len = len(list_res_word)
                 total_cer_dist += cer_dist
                 total_cer_len += cer_len
                 total_wer_dist += wer_dist
@@ -197,8 +198,8 @@ def infer():
                     wer_len = 1000
                 if wer_dist/wer_len > 0:
                     fw.write('uttid:\t{} \nres:\t{}\nref:\t{}\n\n'.format(sample['uttid'], res_txt, ref_txt))
-                sys.stdout.write('\rcurrent cer: {:.3f}, wer: {:.3f};\tall cer {:.3f}, wer: {:.3f} {}/{} {:.2f}%'.format(
-                    cer_dist/cer_len, wer_dist/wer_len, total_cer_dist/total_cer_len,
+                sys.stdout.write('\rcurrent cer: {:.3f}, wer: {:.3f} res/ref: {:.3f};\tall cer {:.3f}, wer: {:.3f} {}/{} {:.2f}%'.format(
+                    cer_dist/cer_len, wer_dist/wer_len, res_len/wer_len, total_cer_dist/total_cer_len,
                     total_wer_dist/total_wer_len, i, len(dataset_dev), i/len(dataset_dev)*100))
                 sys.stdout.flush()
         logging.info('dev CER {:.3f}:  WER: {:.3f}'.format(total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))

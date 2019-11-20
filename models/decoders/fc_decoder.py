@@ -20,7 +20,7 @@ class FCDecoder(Decoder):
         if not shrink:
             len_logits = len_encoded
             logits *= tf.tile(tf.expand_dims(tf.sequence_mask(len_logits, tf.shape(logits)[1], tf.float32), -1),
-                               [1, 1, dim_output])
+                              [1, 1, dim_output])
             align = tf.argmax(logits, -1)
 
             return logits, align, len_logits
@@ -51,7 +51,7 @@ class FCDecoder(Decoder):
             shape_invariants=[tf.TensorShape([]),
                               tf.TensorShape([None, None, dim_output])])
 
-            len_decoded = len_labels + 1 # consist with <eos>
+            len_decoded = len_labels
             preds = tf.argmax(logits_output, -1)
 
             return logits_output, preds, len_decoded

@@ -732,6 +732,7 @@ class DataLoader(SimpleDataLoader):
         self.num_thread = num_thread
         self.num_batch_token = args.num_batch_token
         self.bucket_boundaries = args.bucket_boundaries
+        self.list_batch_size = args.list_infer_batch_size if args.list_infer_batch_size else args.list_batch_size
 
     @abstractmethod
     def __iter__(self):
@@ -755,7 +756,7 @@ class DataLoader(SimpleDataLoader):
             caches[bucket][1].append(seq_labels)
 
             caches[bucket][2] += 1
-            if caches[bucket][2] >= self.args.list_batch_size[id_bucket]:
+            if caches[bucket][2] >= self.list_batch_size[id_bucket]:
                 batch = (caches[bucket][0], caches[bucket][1])
                 yield self.padding_list_seq_with_labels(*batch)
                 caches[bucket] = [[], [], 0]

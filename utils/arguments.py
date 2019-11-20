@@ -146,6 +146,8 @@ elif args.model.encoder.type == 'BLSTM':
     from models.encoders.blstm import BLSTM as encoder
 elif args.model.encoder.type == 'conv':
     from models.encoders.conv import CONV as encoder
+elif args.model.encoder.type == 'conv2':
+    from models.encoders.conv2 import CONV as encoder
 else:
     raise NotImplementedError('not found encoder type: {}'.format(args.model.encoder.type))
 args.model.encoder.type = encoder

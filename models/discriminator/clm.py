@@ -18,51 +18,42 @@ class CLM(LSTM_Model):
         self.dim_hidden = args.model_D.num_hidden
         self.max_input_len = args.max_label_len
         self.num_blocks = args.model_D.num_blocks
+        self.num_fc = args.model_D.num_fc
+        self.hidden_size = args.model_D.hidden_size
         self.training = training
         self.name = name
         self.args = args
         super().__init__(tensor_global_step, training, args, batch=None, name=name)
 
-    # def __call__(self, inputs, len_inputs):
-    #     len_x = self.max_input_len
-    #     inputs *= tf.sequence_mask(len_inputs, maxlen=len_x, dtype=tf.float32)[:, :, None]
-    #     x = tf.layers.dense(inputs, units=self.dim_hidden, use_bias=False)
-    #     for i in range(self.num_blocks):
-    #         inputs = x
-    #         x = tf.layers.conv1d(x, filters=self.dim_hidden, kernel_size=3, strides=1, padding='same')
-    #         x = tf.nn.relu(x)
-    #         x = tf.layers.conv1d(x, filters=self.dim_hidden, kernel_size=3, strides=1, padding='same')
-    #         x = tf.nn.relu(x)
-    #
-    #         x = inputs + 1.0*x
-    #         x = tf.layers.max_pooling1d(x, pool_size=2, strides=2, padding='same')
-    #         len_x = tf.cast(tf.math.ceil(tf.cast(len_x, tf.float32)/2), tf.int32)
-    #
-    #     x = tf.reshape(x, [-1, len_x*self.dim_hidden])
-    #     logits = tf.layers.dense(x, units=1, use_bias=False)
-    #
-    #     return logits
-
     def __call__(self, inputs, len_inputs, reuse=False):
         with tf.variable_scope(self.name, reuse=reuse):
+            batch_size = tf.shape(inputs)[0]
             len_x = self.max_input_len
             inputs *= tf.sequence_mask(len_inputs, maxlen=len_x, dtype=tf.float32)[:, :, None]
             x = tf.layers.dense(inputs, units=self.dim_hidden, use_bias=False)
             for i in range(self.num_blocks):
                 inputs = x
-                x = tf.layers.conv1d(x, filters=self.dim_hidden, kernel_size=3, strides=1, padding='same')
-                x = tf.contrib.layers.layer_norm(x)
+                x = tf.layers.conv1d(x, filters=self.dim_hidden, kernel_size=5, strides=1, padding='same')
                 x = tf.nn.relu(x)
-                x = tf.layers.conv1d(x, filters=self.dim_hidden, kernel_size=3, strides=1, padding='same')
-                x = tf.contrib.layers.layer_norm(x)
+                # x = tf.nn.tanh(x)
+                x = tf.layers.conv1d(x, filters=self.dim_hidden, kernel_size=5, strides=1, padding='same')
+                # x = tf.nn.tanh(x)
                 x = tf.nn.relu(x)
 
-                x = inputs + 1.0*x
-                x = tf.layers.max_pooling1d(x, pool_size=2, strides=2, padding='same')
-                len_x = tf.cast(tf.math.ceil(tf.cast(len_x, tf.float32)/2), tf.int32)
+                x = inputs + 0.3*x
+                # x = tf.layers.max_pooling1d(x, pool_size=2, strides=2, padding='same')
+                # len_x = tf.cast(tf.math.ceil(tf.cast(len_x, tf.float32)/2), tf.int32)
 
-            x = tf.reshape(x, [-1, len_x*self.dim_hidden])
-            logits = tf.layers.dense(x, units=1, use_bias=False)
+            # x = tf.reduce_sum(x, 1) / tf.cast(len_inputs, tf.float32)[:, None]
+            x = tf.reshape(x, [batch_size, len_x*self.dim_hidden])
+            #
+            for i in range(self.num_fc):
+                x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
+                # outputs = tf.nn.leaky_relu(outputs)
+                x = tf.nn.relu(x)
+                # x = tf.nn.tanh(x)
+
+            logits = tf.layers.dense(x, units=1, use_bias=True)[:, 0]
 
         return logits
 
@@ -160,11 +151,11 @@ class CLM(LSTM_Model):
 
         batch_size = tf.shape(real)[0]
         epsilon = tf.random_uniform([batch_size, 1, 1], minval=0., maxval=1.)
-        interpolated = (1-epsilon) * real + epsilon * (fake - real)
+        interpolated = real + epsilon * (fake - real)
         pred = self(interpolated, len_inputs, reuse=True)
-        grad = tf.gradients(pred, interpolated)
+        grad = tf.gradients(pred, interpolated)[0]
         # norm = tf.norm(tf.reshape(grad, [tf.shape(grad)[0], -1]), axis=1)
-        norm = tf.sqrt(1e-8 + tf.reduce_sum(tf.square(grad), axis=[1, 2, 3]))
+        norm = tf.sqrt(1e-8 + tf.reduce_sum(tf.square(grad), axis=[1, 2]))
         gp = tf.reduce_mean((norm - 1.)**2)
 
         return gp

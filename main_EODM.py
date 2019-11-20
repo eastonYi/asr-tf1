@@ -20,6 +20,23 @@ from utils.textTools import array_idx2char, array2text, read_ngram, ngram2kernel
 
 
 def train():
+
+    args.num_gpus = len(args.gpus.split(',')) - 1
+    args.list_gpus = ['/gpu:{}'.format(i) for i in range(args.num_gpus)]
+
+    # bucket
+    if args.bucket_boundaries:
+        args.list_bucket_boundaries = [int(i) for i in args.bucket_boundaries.split(',')]
+
+    assert args.num_batch_tokens
+    args.list_batch_size = ([int(args.num_batch_tokens / boundary) * args.num_gpus
+            for boundary in (args.list_bucket_boundaries)] + [args.num_gpus])
+    args.list_infer_batch_size = ([int(args.num_batch_tokens / boundary)
+            for boundary in (args.list_bucket_boundaries)] + [1])
+    args.batch_size *= args.num_gpus
+    logging.info('\nbucket_boundaries: {} \nbatch_size: {}'.format(
+        args.list_bucket_boundaries, args.list_batch_size))
+
     print('reading data form ', args.dirs.train.tfdata)
     dataReader_train = TFReader(args.dirs.train.tfdata, args=args)
     batch_train = dataReader_train.fentch_batch_bucket()
@@ -51,6 +68,8 @@ def train():
         training=True,
         args=args)
 
+    args.list_gpus = ['/gpu:{}'.format(args.num_gpus)]
+
     G_infer = args.Model(
         tensor_global_step,
         encoder=args.model.encoder.type,
@@ -73,8 +92,7 @@ def train():
     with tf.train.MonitoredTrainingSession(config=config) as sess:
         dataloader_dev.sess = sess
         if args.dirs.checkpoint_G:
-            checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_G)
-            saver_G.restore(sess, checkpoint)
+            saver_G.restore(sess, args.dirs.checkpoint_G)
 
             # cer, wer = dev(
             #     step=0,
@@ -102,22 +120,29 @@ def train():
         num_processed_unbatch = 0
         progress = 0
         progress_unbatch = 0
+        loss_CTC = 0.0; shape_batch = [0,0,0]
+        loss_EODM = 0.0; shape_unbatch=[0,0,0]
         while progress < args.num_epochs:
 
             global_step, lr = sess.run([tensor_global_step, G.learning_rate])
 
-            loss_CTC, shape_batch, _ = sess.run(G.list_run)
-            loss_EODM, shape_unbatch, _ = sess.run(G.list_run_EODM)
+            if global_step % 2 == 0:
+                loss_CTC, shape_batch, _ = sess.run(G.list_run)
+                # loss_CTC = 0.0; shape_batch = [0,0,0]
+            else:
+                loss_EODM, shape_unbatch, _ = sess.run(G.list_run_EODM)
+                # loss_EODM = 0.0; shape_unbatch=[0,0,0]
+
             num_processed += shape_batch[0]
             num_processed_unbatch += shape_unbatch[0]
             used_time = time()-batch_time
             batch_time = time()
-            progress = num_processed/args.data.untrain_size
-            progress_unbatch = num_processed/args.data.untrain_size
+            progress = num_processed/args.data.train_size
+            progress_unbatch = num_processed_unbatch/args.data.untrain_size
 
             if global_step % 50 == 0:
-                logging.info('loss: {:.2f}|{:.2f}\tbatch: {} lr:{:.6f} time:{:.2f}s {:.2f}% {:.2f}% step: {}'.format(
-                              loss_CTC, loss_EODM, shape_batch, lr, used_time, progress*100.0, progress_unbatch*100.0, global_step))
+                logging.info('loss: {:.2f}|{:.2f}\tbatch: {}|{} lr:{:.6f} time:{:.2f}s {:.2f}% {:.2f}% step: {}'.format(
+                              loss_CTC, loss_EODM, shape_batch, shape_unbatch, lr, used_time, progress*100.0, progress_unbatch*100.0, global_step))
                 # summary.summary_scalar('loss_G', loss_G, global_step)
                 # summary.summary_scalar('loss_D', loss_D, global_step)
                 # summary.summary_scalar('lr_G', lr_G, global_step)

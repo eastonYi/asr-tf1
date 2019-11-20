@@ -35,7 +35,7 @@ class CTCModel(Seq2SeqModel):
 
         return logits, align, len_logits
 
-    def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
+    def build_single_graph(self, id_gpu, name_gpu, tensors_input, shrink=False, reuse=tf.AUTO_REUSE):
         feature = tensors_input.feature_splits[id_gpu]
         len_features = tensors_input.len_feat_splits[id_gpu]
         labels = tensors_input.label_splits[id_gpu] if tensors_input.label_splits else None
@@ -47,7 +47,7 @@ class CTCModel(Seq2SeqModel):
             logits, align, len_logits = self(
                 feature,
                 len_features,
-                shrink=False,
+                shrink=shrink,
                 reuse=reuse)
 
             if self.training:
@@ -74,7 +74,7 @@ class CTCModel(Seq2SeqModel):
         if self.training:
             return loss, gradients, [align, labels]
         else:
-            return logits, len_logits
+            return logits, align, len_logits
 
     def ctc_loss(self, logits, len_logits, labels, len_labels):
         """
@@ -98,18 +98,19 @@ class CTCModel(Seq2SeqModel):
     def build_infer_graph(self):
         # cerate input tensors in the cpu
         tensors_input = self.build_infer_input()
-        logits, len_logits = self.build_single_graph(
+        logits, decoded, len_logits = self.build_single_graph(
             id_gpu=0,
             name_gpu=self.list_gpu_devices[0],
-            tensors_input=tensors_input)
+            tensors_input=tensors_input,
+            shrink=True)
 
-        decoded_sparse = self.ctc_decode(logits, len_logits)
-        decoded = tf.sparse_to_dense(
-            sparse_indices=decoded_sparse.indices,
-            output_shape=decoded_sparse.dense_shape,
-            sparse_values=decoded_sparse.values,
-            default_value=0,
-            validate_indices=True)
+        # decoded_sparse = self.ctc_decode(logits, len_logits)
+        # decoded = tf.sparse_to_dense(
+        #     sparse_indices=decoded_sparse.indices,
+        #     output_shape=decoded_sparse.dense_shape,
+        #     sparse_values=decoded_sparse.values,
+        #     default_value=0,
+        #     validate_indices=True)
         distribution = tf.nn.softmax(logits)
 
         return decoded, tensors_input.shape_batch, distribution

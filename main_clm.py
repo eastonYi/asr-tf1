@@ -25,8 +25,8 @@ def train():
     dataReader_train = TFReader(args.dirs.train.tfdata, args=args)
     batch_train = dataReader_train.fentch_batch_bucket()
     dataReader_untrain = TFReader(args.dirs.untrain.tfdata, args=args)
-    # batch_untrain = dataReader_untrain.fentch_batch(args.batch_size)
-    batch_untrain = dataReader_untrain.fentch_batch_bucket()
+    batch_untrain = dataReader_untrain.fentch_batch(args.batch_size)
+    # batch_untrain = dataReader_untrain.fentch_batch_bucket()
     args.dirs.untrain.tfdata = Path(args.dirs.untrain.tfdata)
     args.data.untrain_size = TFData.read_tfdata_info(args.dirs.untrain.tfdata)['size_dataset']
 
@@ -45,10 +45,10 @@ def train():
     # tensor_global_step = tf.train.get_or_create_global_step()
     tensor_global_step0 = tf.Variable(0, dtype=tf.int32, trainable=False)
     tensor_global_step1 = tf.Variable(0, dtype=tf.int32, trainable=False)
-    tensor_global_step2 = tf.Variable(0, dtype=tf.int32, trainable=False)
+    # tensor_global_step2 = tf.Variable(0, dtype=tf.int32, trainable=False)
 
     G = args.Model(
-        tensor_global_step2,
+        tensor_global_step0,
         encoder=args.model.encoder.type,
         decoder=args.model.decoder.type,
         batch=batch_train,
@@ -57,12 +57,14 @@ def train():
         args=args)
 
     G_infer = args.Model(
-        tensor_global_step2,
+        tensor_global_step0,
         encoder=args.model.encoder.type,
         decoder=args.model.decoder.type,
         training=False,
         args=args)
-    vars_G = G.variables()
+    # from models.generator.baseGenerator import Generator
+    # G = G_infer = Generator(tensor_global_step0, hidden=128, num_blocks=5, args=args)
+    vars_G = G.trainable_variables
 
     D = args.Model_D(
         tensor_global_step0,
@@ -71,7 +73,7 @@ def train():
         args=args)
 
     gan = args.GAN([tensor_global_step0, tensor_global_step1], G, D,
-                   batch=batch_untrain, name='GAN', args=args)
+                   batch=batch_train, unbatch=batch_untrain, name='GAN', args=args)
 
     size_variables()
 
@@ -87,8 +89,9 @@ def train():
     with tf.train.MonitoredTrainingSession(config=config) as sess:
         dataloader_dev.sess = sess
         if args.dirs.checkpoint_G:
-            checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_G)
-            saver_G.restore(sess, checkpoint)
+            # checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_G)
+            # import pdb; pdb.set_trace()
+            saver_G.restore(sess, args.dirs.checkpoint_G)
 
             # cer, wer = dev(
             #     step=0,
@@ -113,36 +116,42 @@ def train():
 
         batch_time = time()
         num_processed = 0
+        num_processed_unbatch = 0
         progress = 0
         while progress < args.num_epochs:
 
-            global_step, lr, lr_G, lr_D = sess.run([tensor_global_step2, G.learning_rate, gan.learning_rate_G, gan.learning_rate_D])
+            global_step, lr_G, lr_D = sess.run([tensor_global_step1, gan.learning_rate_G, gan.learning_rate_D])
 
             # untrain
             text = sess.run(iter_text)
             text_lens = get_batch_length(text)
-            shape_feature = sess.run(gan.list_info[0])
+            shape_feature, shape_unfeature = sess.run(gan.list_feature_shape)
             shape_text = text.shape
-            loss_D, _ = sess.run(gan.list_train_D,
-                                 feed_dict={gan.list_pl[0]:text,
-                                            gan.list_pl[1]:text_lens})
-            loss_G, _ = sess.run(gan.list_train_G)
-            # loss_G = 0.0
-            # loss_D = 0.0
+            loss_D, loss_D_res, loss_D_text, loss_gp, _ = sess.run(gan.list_train_D,
+                                                          feed_dict={gan.list_pl[0]:text,
+                                                                     gan.list_pl[1]:text_lens})
+            loss_G, loss_G_supervise, _ = sess.run(gan.list_train_G)
+            # loss_D_res = - loss_G
+            # loss_G = loss_G_supervise = 0.0
+            # loss_D = loss_D_text = loss_gp = 0.0
             # train
             # if global_step % 5 == 0:
-            for _ in range(1):
-                loss_supervise, shape_batch, _, _ = sess.run(G.list_run)
-            # loss_supervise = 0
+            # for _ in range(2):
+            #     loss_supervise, shape_batch, _, _ = sess.run(G.list_run)
+            # loss_G_supervise = 0
 
             num_processed += shape_feature[0]
+            num_processed_unbatch += shape_unfeature[0]
             used_time = time()-batch_time
             batch_time = time()
-            progress = num_processed/args.data.untrain_size
+            progress = num_processed/args.data.train_size
+            progress_unbatch = num_processed_unbatch/args.data.untrain_size
 
-            if global_step % 50 == 0:
-                logging.info('loss_supervise: {:.2f}, loss: {:.1f}|{:.1f}\tbatch: {}|{} lr:{:.6f} {:.6f}|{:.6f} time:{:.2f}s {:.3f}% step: {}'.format(
-                              loss_supervise, loss_G, loss_D, shape_feature, shape_text, lr, lr_G, lr_D, used_time, progress*100.0, global_step))
+            if global_step % 20 == 0:
+                # print('loss_G: {:.2f} loss_G_supervise: {:.2f} loss_D_res: {:.2f} loss_D_text: {:.2f} step: {}'.format(
+                #        loss_G, loss_G_supervise, loss_D_res, loss_D_text, global_step))
+                print('loss_supervise: {:.2f}, loss res|real|gp: {:.2f}|{:.2f}|{:.2f}\tbatch: {}|{}|{}\tlr:{:.1e}|{:.1e} {:.2f}s {:.1f}%|{:.1f}% step: {}'.format(
+                       loss_G_supervise, loss_D_res, loss_D_text, loss_gp, shape_feature, shape_unfeature, shape_text, lr_G, lr_D, used_time, progress*100.0, progress_unbatch*100.0, global_step))
                 # summary.summary_scalar('loss_G', loss_G, global_step)
                 # summary.summary_scalar('loss_D', loss_D, global_step)
                 # summary.summary_scalar('lr_G', lr_G, global_step)
