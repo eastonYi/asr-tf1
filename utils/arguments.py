@@ -59,8 +59,11 @@ else:
 
 args.dirs.train.tfdata = Path(args.dirs.train.tfdata)
 args.dirs.dev.tfdata = Path(args.dirs.dev.tfdata)
-mkdirs(args.dirs.train.tfdata)
-mkdirs(args.dirs.dev.tfdata)
+try:
+    mkdirs(args.dirs.train.tfdata)
+    mkdirs(args.dirs.dev.tfdata)
+except:
+    pass
 args.dirs.train.feat_len = args.dirs.train.tfdata/'feature_length.txt'
 args.dirs.dev.feat_len = args.dirs.dev.tfdata/'feature_length.txt'
 
@@ -118,6 +121,8 @@ elif args.dirs.type == 'scp_classify':
         class_file=args.dirs.test.label,
         args=args,
         _shuffle=False)
+elif args.dirs.type == 'test':
+    dataset_dev = dataset_train = dataset_test = None
 else:
     raise NotImplementedError('not dataset type!')
 args.dataset_dev = dataset_dev

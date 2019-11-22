@@ -15,11 +15,10 @@ class CLM(LSTM_Model):
     if ndim of input is 2, then convert it to onehot
     """
     def __init__(self, tensor_global_step, training, name, args):
-        self.dim_hidden = args.model_D.num_hidden
+        self.hidden_size = args.model_D.hidden_size
         self.max_input_len = args.max_label_len
         self.num_blocks = args.model_D.num_blocks
         self.num_fc = args.model_D.num_fc
-        self.hidden_size = args.model_D.hidden_size
         self.training = training
         self.name = name
         self.args = args
@@ -30,13 +29,13 @@ class CLM(LSTM_Model):
             batch_size = tf.shape(inputs)[0]
             len_x = self.max_input_len
             inputs *= tf.sequence_mask(len_inputs, maxlen=len_x, dtype=tf.float32)[:, :, None]
-            x = tf.layers.dense(inputs, units=self.dim_hidden, use_bias=False)
+            x = tf.layers.dense(inputs, units=self.hidden_size, use_bias=False)
             for i in range(self.num_blocks):
                 inputs = x
-                x = tf.layers.conv1d(x, filters=self.dim_hidden, kernel_size=5, strides=1, padding='same')
+                x = tf.layers.conv1d(x, filters=self.hidden_size, kernel_size=5, strides=1, padding='same')
                 x = tf.nn.relu(x)
                 # x = tf.nn.tanh(x)
-                x = tf.layers.conv1d(x, filters=self.dim_hidden, kernel_size=5, strides=1, padding='same')
+                x = tf.layers.conv1d(x, filters=self.hidden_size, kernel_size=5, strides=1, padding='same')
                 # x = tf.nn.tanh(x)
                 x = tf.nn.relu(x)
 
@@ -45,13 +44,13 @@ class CLM(LSTM_Model):
                 # len_x = tf.cast(tf.math.ceil(tf.cast(len_x, tf.float32)/2), tf.int32)
 
             # x = tf.reduce_sum(x, 1) / tf.cast(len_inputs, tf.float32)[:, None]
-            x = tf.reshape(x, [batch_size, len_x*self.dim_hidden])
+            x = tf.reshape(x, [batch_size, len_x*self.hidden_size])
             #
-            for i in range(self.num_fc):
-                x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
-                # outputs = tf.nn.leaky_relu(outputs)
-                x = tf.nn.relu(x)
-                # x = tf.nn.tanh(x)
+            # for i in range(self.num_fc):
+            #     x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
+            #     # outputs = tf.nn.leaky_relu(outputs)
+            #     x = tf.nn.relu(x)
+            #     # x = tf.nn.tanh(x)
 
             logits = tf.layers.dense(x, units=1, use_bias=True)[:, 0]
 
@@ -66,7 +65,7 @@ class CLM(LSTM_Model):
     #     with tf.variable_scope(self.name, reuse=reuse):
     #         encoder_output = tf.layers.dense(
     #             inputs=features,
-    #             units=self.dim_hidden,
+    #             units=self.hidden_size,
     #             activation=None,
     #             use_bias=False,
     #             name='clm_fc')
@@ -92,9 +91,9 @@ class CLM(LSTM_Model):
     #                                               query_antecedent=encoder_output,
     #                                               memory_antecedent=None,
     #                                               bias=encoder_attention_bias,
-    #                                               total_key_depth=self.dim_hidden,
-    #                                               total_value_depth=self.dim_hidden,
-    #                                               output_depth=self.dim_hidden,
+    #                                               total_key_depth=self.hidden_size,
+    #                                               total_value_depth=self.hidden_size,
+    #                                               output_depth=self.hidden_size,
     #                                               num_heads=self.num_heads,
     #                                               dropout_rate=self.attention_dropout_rate,
     #                                               name='clm_self_attention',
@@ -105,8 +104,8 @@ class CLM(LSTM_Model):
     #                 encoder_output = residual(encoder_output,
     #                                           ff_hidden(
     #                                               inputs=encoder_output,
-    #                                               hidden_size=4 * self.dim_hidden,
-    #                                               output_size=self.dim_hidden,
+    #                                               hidden_size=4 * self.hidden_size,
+    #                                               output_size=self.hidden_size,
     #                                               activation=self._ff_activation),
     #                                           dropout_rate=self.residual_dropout_rate)
     #         # Mask padding part to zeros.

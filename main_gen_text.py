@@ -14,33 +14,41 @@ from utils.arguments import args
 from utils.dataset import TextDataSet
 from utils.summaryTools import Summary
 from utils.textTools import array_idx2char, array2text
-from utils.tools import get_batch_length
+from utils.tools import get_batch_length, int2vector
 from models.generator.baseGenerator import Generator
-from models.gan import Random_GAN
+from models.gan import Conditional_GAN
 
 
 def train():
     dataset_text = TextDataSet(list_files=[args.dirs.text.data], args=args, _shuffle=True)
     tfdata_train = tf.data.Dataset.from_generator(
         dataset_text, (tf.int32), (tf.TensorShape([None])))
-    iter_text = tfdata_train.cache().repeat().shuffle(1000).\
+    iter_text = tfdata_train.cache().repeat().shuffle(10000).\
         padded_batch(args.text_batch_size, ([args.max_label_len])).prefetch(buffer_size=5).\
         make_one_shot_iterator().get_next()
 
     tensor_global_step0 = tf.Variable(0, dtype=tf.int32, trainable=False)
     tensor_global_step1 = tf.Variable(0, dtype=tf.int32, trainable=False)
 
-    G = G_infer = Generator(tensor_global_step0, hidden=128, num_blocks=5, args=args)
+    G = Generator(tensor_global_step0,
+                  hidden=args.model.hidden_size,
+                  num_blocks=args.model.num_blocks,
+                  training=True,
+                  args=args)
+    G_infer = Generator(tensor_global_step0,
+                        hidden=args.model.hidden_size,
+                        num_blocks=args.model.num_blocks,
+                        training=False,
+                        args=args)
     vars_G = G.trainable_variables
 
-    D = args.Model_D(
-        tensor_global_step1,
-        training=True,
-        name='discriminator',
-        args=args)
-
-    gan = Random_GAN([tensor_global_step0, tensor_global_step1], G, D,
-                     batch=None, unbatch=None, name='text_gan', args=args)
+    # D = args.Model_D(tensor_global_step1,
+    #                  training=True,
+    #                  name='discriminator',
+    #                  args=args)
+    #
+    # gan = Conditional_GAN([tensor_global_step0, tensor_global_step1], G, D,
+    #                  batch=None, unbatch=None, name='text_gan', args=args)
 
     size_variables()
 
@@ -57,20 +65,51 @@ def train():
         if args.dirs.checkpoint_G:
             saver_G.restore(sess, args.dirs.checkpoint_G)
 
+        text_supervise = sess.run(iter_text)
+        text_len_supervise = get_batch_length(text_supervise)
+        feature_text_supervise = np.tile((text_supervise / args.dim_output)[:, :, None], args.model.dim_input)
+        feature_text_supervise += np.random.randn(*feature_text_supervise.shape)/100
+
         batch_time = time()
         global_step = 0
         while global_step < 99999999:
 
-            global_step, lr_G, lr_D = sess.run([tensor_global_step1, gan.learning_rate_G, gan.learning_rate_D])
+            # global_step, lr_G, lr_D = sess.run([tensor_global_step0, gan.learning_rate_G, gan.learning_rate_D])
+            global_step, lr_G = sess.run([tensor_global_step0, G.learning_rate])
 
-            # untrain
-            text = sess.run(iter_text)
-            text_lens = get_batch_length(text)
-            shape_text = text.shape
-            loss_D, loss_D_res, loss_D_text, loss_gp, _ = sess.run(gan.list_train_D,
-                                                          feed_dict={gan.list_pl[0]:text,
-                                                                     gan.list_pl[1]:text_lens})
-            loss_G, _ = sess.run(gan.list_train_G)
+            # supervise
+            loss_G_supervise, _ = sess.run(G.run_list,
+                                 feed_dict={G.list_pl[0]:feature_text_supervise,
+                                            G.list_pl[1]:text_len_supervise,
+                                            G.list_pl[2]:text_supervise,
+                                            G.list_pl[3]:text_len_supervise})
+
+            text_supervise = sess.run(iter_text)
+            text_lens_G = text_len_supervise = get_batch_length(text_supervise)
+            feature_text_supervise = int2vector(text_supervise)
+            # feature_text_supervise += np.random.randn(*feature_text_supervise.shape)/500
+            feature_text = feature_text_supervise
+            loss_D_res = loss_D_text = loss_gp = 0
+            shape_text = [0,0,0]
+            # # generator input
+            # text_G = sess.run(iter_text)
+            # text_lens_G = get_batch_length(text_G)
+            # feature_text = np.tile((text_G / args.dim_output)[:, :, None], args.model.dim_input)
+            # feature_text += np.random.randn(*feature_text.shape)/100
+            # loss_G, _ = sess.run(gan.list_train_G,
+            #                      feed_dict={gan.list_G_pl[0]:feature_text,
+            #                                 gan.list_G_pl[1]:text_lens_G})
+
+            # # discriminator input
+            # text_D = sess.run(iter_text)
+            # text_lens_D = get_batch_length(text_D)
+            # shape_text = text_D.shape
+            # loss_D, loss_D_res, loss_D_text, loss_gp, _ = sess.run(gan.list_train_D,
+            #         feed_dict={gan.list_D_pl[0]:text_D,
+            #                    gan.list_D_pl[1]:text_lens_D,
+            #                    gan.list_G_pl[0]:feature_text,
+            #                    gan.list_G_pl[1]:text_lens_G})
+
             # loss_D_res = - loss_G
             # loss_G = loss_G_supervise = 0.0
             # loss_D = loss_D_text = loss_gp = 0.0
@@ -82,11 +121,11 @@ def train():
             used_time = time()-batch_time
             batch_time = time()
 
-            if global_step % 20 == 0:
+            if global_step % 10 == 0:
                 # print('loss_G: {:.2f} loss_G_supervise: {:.2f} loss_D_res: {:.2f} loss_D_text: {:.2f} step: {}'.format(
                 #        loss_G, loss_G_supervise, loss_D_res, loss_D_text, global_step))
-                print('loss res|real|gp: {:.2f}|{:.2f}|{:.2f}\tbatch: {}\tlr:{:.1e}|{:.1e} {:.2f}s step: {}'.format(
-                       loss_D_res, loss_D_text, loss_gp, shape_text, lr_G, lr_D, used_time, global_step))
+                print('loss_G_supervise: {:.2f} loss res|real|gp: {:.2f}|{:.2f}|{:.2f}\tbatch: {}\tlr:{:.1e} {:.2f}s step: {}'.format(
+                       loss_G_supervise, loss_D_res, loss_D_text, loss_gp, shape_text, lr_G, used_time, global_step))
                 # summary.summary_scalar('loss_G', loss_G, global_step)
                 # summary.summary_scalar('loss_D', loss_D, global_step)
                 # summary.summary_scalar('lr_G', lr_G, global_step)
@@ -97,11 +136,18 @@ def train():
 
             # if global_step % args.decode_step == args.decode_step - 1:
             if global_step % args.decode_step == 1:
-                samples, len_samples = sess.run(G.run_list)
+                logits, samples, len_samples = sess.run(G_infer.run_list,
+                                                feed_dict={G_infer.list_pl[0]:feature_text,
+                                                           G_infer.list_pl[1]:text_lens_G})
+
                 list_res_txt = array_idx2char(samples, args.idx2token, seperator=' ')
-                for text_sample in list_res_txt[:10]:
+                list_ref_txt = array_idx2char(text_supervise, args.idx2token, seperator=' ')
+
+                for res, ref in zip(list_res_txt[:5], list_ref_txt):
                     # text_sample = args.idx2token[sample]
-                    print('sampled: ', text_sample)
+                    print('sampled: ', res)
+                    print('label  : ', ref)
+
 
     logging.info('training duration: {:.2f}h'.format((datetime.now()-start_time).total_seconds()/3600))
 

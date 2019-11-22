@@ -265,7 +265,7 @@ class GAN:
         self.optimizer_D = tf.train.RMSPropOptimizer(self.learning_rate_D)
 
 
-class Random_GAN(GAN):
+class Conditional_GAN(GAN):
 
     def build_graph(self):
         self.build_optimizer()
@@ -301,13 +301,15 @@ class Random_GAN(GAN):
 
     def build_single_graph(self, id_gpu, name_gpu, tensors_input):
 
+        feature = tensors_input.feature_splits[id_gpu]
+        len_feature = tensors_input.len_feat_splits[id_gpu]
         text = tensors_input.text_splits[id_gpu]
         len_text = tensors_input.len_text_splits[id_gpu]
 
         with tf.device(name_gpu):
             # G loss
             # loss_G_supervise = tf.constant(0.0)
-            logits_G_un, len_decoded = self.G(reuse=True)
+            logits_G_un, len_decoded = self.G(feature, len_feature, reuse=True)
 
             # D loss fake
             logits_G_un = batch3D_pad_to(logits_G_un, length=self.args.max_label_len)
@@ -327,7 +329,7 @@ class Random_GAN(GAN):
             # gp = tf.constant(0.0)
 
             # loss_D_res = tf.constant(0.0)
-            loss_D = loss_D_res + loss_D_text +  gp
+            loss_D = loss_D_res + loss_D_text + gp
             # loss_D = loss_D_res
             loss_G = -loss_D_res
             # loss_D = loss_D_res + loss_D_text
@@ -346,20 +348,24 @@ class Random_GAN(GAN):
 
         return loss_D, loss_G, gradients_D, gradients_G, [loss_D_res, loss_D_text, gp]
 
-
     def build_input(self):
         """
         stand training input
         only use feature rather label in GAN training
         """
         tensors_input = namedtuple('tensors_input',
-            'feature_splits, len_feat_splits, text_splits, len_text_splits, shape_batch')
+            'feature_splits, len_feat_splits, text_splits, len_text_splits')
 
         with tf.device(self.center_device), tf.name_scope("GAN_inputs"):
+            batch_feature = tf.placeholder(tf.float32, [None, None, self.args.model.dim_input], name='input_feature')
+            batch_feature_len = tf.placeholder(tf.int32, [None], name='input_len_feat')
             batch_text = tf.placeholder(tf.int32, [None, None], name='input_text')
             batch_text_lens = tf.placeholder(tf.int32, [None], name='input_len_text')
-            self.list_pl = [batch_text, batch_text_lens]
+            self.list_G_pl = [batch_feature, batch_feature_len]
+            self.list_D_pl = [batch_text, batch_text_lens]
 
+            tensors_input.feature_splits = tf.split(batch_feature, self.num_gpus, name="feature_splits")
+            tensors_input.len_feat_splits = tf.split(batch_feature_len, self.num_gpus, name="len_feat_splits")
             tensors_input.text_splits = tf.split(batch_text, self.num_gpus, name="text_splits")
             tensors_input.len_text_splits = tf.split(batch_text_lens, self.num_gpus, name="len_text_splits")
 
@@ -384,17 +390,14 @@ class Random_GAN(GAN):
         #         peak=self.args.peak,
         #         decay_rate=0.5,
         #         decay_steps=self.args.decay_steps)
+        self.optimizer_G = tf.train.AdamOptimizer(self.learning_rate_G,
+                                                   beta1=0.5,
+                                                   beta2=0.9,
+                                                   epsilon=1e-9)
+        self.optimizer_D = tf.train.AdamOptimizer(self.learning_rate_D,
+                                                   beta1=0.5,
+                                                   beta2=0.9,
+                                                   epsilon=1e-9)
 
-        # self.optimizer_D = tf.train.AdamOptimizer(self.learning_rate_D,
-        #                                           beta1=0.5,
-        #                                           beta2=0.9,
-        #                                           epsilon=1e-9,
-        #                                           name='optimizer_D')
-
-        # self.optimizer_G = tf.train.AdamOptimizer(self.learning_rate_G,
-        #                                           beta1=0.5,
-        #                                           beta2=0.9,
-        #                                           epsilon=1e-9,
-        #                                           name='optimizer_G')
-        self.optimizer_G = tf.train.RMSPropOptimizer(self.learning_rate_G)
-        self.optimizer_D = tf.train.RMSPropOptimizer(self.learning_rate_D)
+        # self.optimizer_G = tf.train.RMSPropOptimizer(self.learning_rate_G)
+        # self.optimizer_D = tf.train.RMSPropOptimizer(self.learning_rate_D)

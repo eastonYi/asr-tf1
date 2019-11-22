@@ -11,9 +11,9 @@ from tempfile import mkstemp
 
 def get_batch_length(batch):
     if batch.ndim == 3:
-        return np.sum(np.max(np.abs(batch) > 0, -1), -1)
+        return np.sum(np.max(np.abs(batch) > 0, -1), -1, dtype=np.int32)
     elif batch.ndim == 2:
-        return np.sum(np.abs(batch) > 0, -1)
+        return np.sum(np.abs(batch) > 0, -1, dtype=np.int32)
 
 
 def mkdirs(filename):
@@ -543,3 +543,25 @@ def align2bound(align):
         list_stamps = None
 
     return np.array(list_stamps)
+
+
+def int2vector(seqs, hidden_size=10):
+    """
+    m = np.array([[2,3,4],
+                  [5,6,0]])
+    int2vector(m, 5)
+    """
+    list_res = []
+    for seq in seqs:
+        lilst_seq = []
+        for m in seq:
+            list_feat = []
+            for i in np.arange(hidden_size-1, -1, -1):
+                dec = np.power(2, i)
+                p = m // dec
+                m -= p * dec
+                list_feat.append(p)
+            lilst_seq.append(list_feat)
+        list_res.append(lilst_seq)
+
+    return np.array(list_res, np.float32)
