@@ -19,6 +19,8 @@ dirs:
     text:
         # data: /mnt/lustre/xushuang2/easton/data/aishell/phone/text-120k.phone67
         data: /home/user/easton/data/AISHELL/phone/text-120k.phone67
+        supervise: /home/user/easton/data/AISHELL/phone/text-50.phone67
+        dev: /home/user/easton/data/AISHELL/phone/dev-14k.phone67
     type: test
     # vocab: /mnt/lustre/xushuang2/easton/data/aishell/phone/phones_67+1.vocab
     vocab: /home/user/easton/data/AISHELL/phone/phones_67+1.vocab
@@ -38,6 +40,7 @@ model:
     num_blocks: 5
     dim_input: 10
     hidden_size: 512
+    num_filters: 128
     num_fc: 3
     encoder:
         type: conv2
@@ -47,21 +50,24 @@ model:
 model_D:
     type: clm
     num_blocks: 5
-    hidden_size: 512
+    hidden_size: 128
     num_fc: 2
     max_feat_len: 1000
 
+noise: 4.0
 # lr_type: constant_learning_rate
 optimizer: adam
 # lr: 0.0001
+rate: 0.1
 lr_G: 0.001
-lr_D: 0.0005
+lr_D: 0.001
 supervise_G_rate: 1.0
 warmup_steps: 5000
 peak: 0.001
 decay_steps: 8000
 
-decode_step: 50
+decode_step: 100
+dev_step: 100
 save_step: 1000
 num_epochs: 999
 
@@ -71,9 +77,9 @@ num_epochs: 999
 gpus: '0'
 batch_size: 160
 beam_size: 1
-text_batch_size: 500
+text_batch_size: 200
 max_label_len: 20
-num_batch_tokens: 30000
+num_batch_tokens: 20000
 bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
 
 lambda_lm: 0.0

@@ -6,6 +6,7 @@ from collections import namedtuple
 from ..utils.gradientTools import average_gradients, handle_gradients
 from ..utils.tools import choose_device, smoothing_cross_entropy, warmup_exponential_decay
 from ..lstmModel import LSTM_Model
+from ..utils.blocks import normal_conv, block
 
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format='%(levelname)s(%(filename)s:%(lineno)d): %(message)s')
 
@@ -18,6 +19,7 @@ class Generator():
         self.batch_size = int(args.text_batch_size/args.num_gpus)
         self.dim_input = args.model.dim_input
         self.max_input_len = args.max_label_len
+        self.num_filters = args.model.num_filters
         self.dim_hidden = hidden
         self.num_blocks = num_blocks
         self.args = args
@@ -30,41 +32,61 @@ class Generator():
         self.trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
 
     def __call__(self, seq_input, sen_len, reuse=False):
-        """
-        seq_input: [b, seq_len, dim_input]
-        conv generator
-        """
+
         with tf.variable_scope(self.name, reuse=reuse):
-            # inputs = tf.random_normal([int(self.batch_size), self.max_input_len])
             seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
             x = tf.layers.dense(seq_input, self.dim_hidden, use_bias=False)
-            # x = tf.reshape(x, [self.batch_size, self.max_input_len, self.dim_hidden])
-            for i in range(5):
+            for i in range(2):
                 x = tf.layers.dense(x, units=self.dim_hidden, use_bias=True)
                 x = tf.nn.relu(x)
-
             logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
 
         return logits, sen_len
 
+    # def __call__(self, seq_input, sen_len, reuse=False):
+    #     """
+    #     seq_input: [b, seq_len, dim_input]
+    #     conv generator
+    #     """
+    #     with tf.variable_scope(self.name, reuse=reuse):
+    #         seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
+    #         x = tf.layers.dense(seq_input, self.dim_hidden, use_bias=False)
+    #         x = tf.reshape(x, [self.batch_size, self.max_input_len, self.dim_hidden, 1])
+    #         # for i in range(5):
+    #         #     x = tf.layers.dense(x, units=self.dim_hidden, use_bias=True)
+    #         #     x = tf.nn.relu(x)
+    #         for i in range(3):
+    #             # x = block(x, num_filters, i, kernel=(3,9))
+    #             x = normal_conv(
+    #                 inputs=x,
+    #                 filter_num=self.num_filters,
+    #                 kernel=(7,9),
+    #                 stride=(1,1),
+    #                 padding='SAME',
+    #                 use_relu=True,
+    #                 name="res_"+str(i),
+    #                 norm_type=None
+    #                 )
+    #         x = tf.reshape(x, [self.batch_size, self.max_input_len, self.dim_hidden*self.num_filters])
+    #         logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
+    #
+    #     return logits, sen_len
+
     def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
         features = tensors_input.seq_input[id_gpu]
         len_features = tensors_input.seq_len[id_gpu]
-        labels = tensors_input.labels[id_gpu]
-        len_labels = tensors_input.len_labels[id_gpu]
 
         with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
-        # with tf.device(self.center_device):
             logits, len_logits = self(features, len_features, reuse=reuse)
-            loss = self.ce_loss(logits, labels, len_labels)
-            loss = tf.reduce_mean(loss, -1)
-            # loss = tf.reduce_mean(logits)
 
-        if self.training:
-            with tf.name_scope("gradients"):
-                # var_list=self.trainable_variables()
-                gradients = self.optimizer.compute_gradients(loss)
-            # import pdb; pdb.set_trace()
+            if self.training:
+                labels = tensors_input.labels[id_gpu]
+                len_labels = tensors_input.len_labels[id_gpu]
+                loss = self.ce_loss(logits, labels, len_labels)
+                loss = tf.reduce_mean(loss, -1)
+
+                with tf.name_scope("gradients"):
+                    gradients = self.optimizer.compute_gradients(loss, var_list=self.trainable_variables())
 
         self.__class__.num_Model += 1
         logging.info('\tbuild {} on {} succesfully! total model number: {}'.format(
@@ -170,8 +192,8 @@ class Generator():
         #     decay_steps=self.args.decay_steps)
 
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
-                                               beta1=0.5,
-                                               beta2=0.9,
+                                               beta1=0.01,
+                                               beta2=0.1,
                                                epsilon=1e-9,
                                                name=self.args.optimizer)
 

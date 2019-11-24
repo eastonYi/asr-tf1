@@ -77,3 +77,13 @@ def decode_test(step, sample, model, sess, unit, idx2token, eos_idx=None, min_id
         shape_sample[1], res_txt, ref_txt))
 
     return len_logits
+
+
+def accuracy(res, ref, length):
+    total = np.sum(length)
+    num_correct = 0
+    for s, f, l in zip(res, ref, length):
+        num_correct += np.sum(np.equal(s, f)[:l])
+    acc = num_correct / total
+
+    return acc

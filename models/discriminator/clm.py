@@ -34,27 +34,49 @@ class CLM(LSTM_Model):
                 inputs = x
                 x = tf.layers.conv1d(x, filters=self.hidden_size, kernel_size=5, strides=1, padding='same')
                 x = tf.nn.relu(x)
-                # x = tf.nn.tanh(x)
                 x = tf.layers.conv1d(x, filters=self.hidden_size, kernel_size=5, strides=1, padding='same')
-                # x = tf.nn.tanh(x)
                 x = tf.nn.relu(x)
 
                 x = inputs + 0.3*x
-                # x = tf.layers.max_pooling1d(x, pool_size=2, strides=2, padding='same')
-                # len_x = tf.cast(tf.math.ceil(tf.cast(len_x, tf.float32)/2), tf.int32)
 
             # x = tf.reduce_sum(x, 1) / tf.cast(len_inputs, tf.float32)[:, None]
             x = tf.reshape(x, [batch_size, len_x*self.hidden_size])
-            #
-            # for i in range(self.num_fc):
-            #     x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
-            #     # outputs = tf.nn.leaky_relu(outputs)
-            #     x = tf.nn.relu(x)
-            #     # x = tf.nn.tanh(x)
 
             logits = tf.layers.dense(x, units=1, use_bias=True)[:, 0]
 
         return logits
+
+    # def __call__(self, inputs, len_inputs, reuse=False):
+    #     with tf.variable_scope(self.name, reuse=reuse):
+    #         batch_size = tf.shape(inputs)[0]
+    #         len_x = self.max_input_len
+    #         inputs *= tf.sequence_mask(len_inputs, maxlen=len_x, dtype=tf.float32)[:, :, None]
+    #         x = tf.layers.dense(inputs, units=self.hidden_size, use_bias=False)
+    #         for i in range(self.num_blocks):
+    #             inputs = x
+    #             x = tf.layers.conv1d(x, filters=self.hidden_size, kernel_size=5, strides=1, padding='same')
+    #             x = tf.nn.relu(x)
+    #             # x = tf.nn.tanh(x)
+    #             x = tf.layers.conv1d(x, filters=self.hidden_size, kernel_size=5, strides=1, padding='same')
+    #             # x = tf.nn.tanh(x)
+    #             x = tf.nn.relu(x)
+    #
+    #             x = inputs + 0.3*x
+    #             # x = tf.layers.max_pooling1d(x, pool_size=2, strides=2, padding='same')
+    #             # len_x = tf.cast(tf.math.ceil(tf.cast(len_x, tf.float32)/2), tf.int32)
+    #
+    #         # x = tf.reduce_sum(x, 1) / tf.cast(len_inputs, tf.float32)[:, None]
+    #         x = tf.reshape(x, [batch_size, len_x*self.hidden_size])
+    #         #
+    #         # for i in range(self.num_fc):
+    #         #     x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
+    #         #     # outputs = tf.nn.leaky_relu(outputs)
+    #         #     x = tf.nn.relu(x)
+    #         #     # x = tf.nn.tanh(x)
+    #
+    #         logits = tf.layers.dense(x, units=1, use_bias=True)[:, 0]
+    #
+    #     return logits
 
     # def __call__(self, features, len_features, reuse=False):
     #     self.attention_dropout_rate = 0.1
