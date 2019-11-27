@@ -13,11 +13,12 @@ from models.utils.tools import get_session, size_variables
 from utils.arguments import args
 from utils.dataset import TextDataSet
 from utils.summaryTools import Summary
-from utils.textTools import array_idx2char, array2text
+from utils.textTools import array_idx2char, array2text, batch_cer
 from utils.tools import get_batch_length, int2vector
 from utils.performanceTools import accuracy
 from models.generator.baseGenerator import Generator
 from models.gan import Conditional_GAN
+
 
 def train():
     dataset_text = TextDataSet(list_files=[args.dirs.text.data], args=args, _shuffle=True)
@@ -31,7 +32,7 @@ def train():
     tfdata_supervise = tf.data.Dataset.from_generator(
         dataset_text_supervise, (tf.int32), (tf.TensorShape([None])))
     iter_supervise = tfdata_supervise.cache().repeat().shuffle(100).\
-        padded_batch(10, ([args.max_label_len])).prefetch(buffer_size=5).\
+        padded_batch(args.num_supervised, ([args.max_label_len])).prefetch(buffer_size=5).\
         make_one_shot_iterator().get_next()
 
     dataset_text_dev = TextDataSet(list_files=[args.dirs.text.dev], args=args, _shuffle=False)
@@ -80,13 +81,29 @@ def train():
         if args.dirs.checkpoint_G:
             saver_G.restore(sess, args.dirs.checkpoint_G)
 
+        np.random.seed(0)
         text_supervise = sess.run(iter_supervise)
         text_len_supervise = get_batch_length(text_supervise)
-        feature_text_supervise = int2vector(text_supervise)
-        feature_text_supervise += np.random.randn(*feature_text_supervise.shape)/args.noise
-
+        feature_supervise, feature_len_supervise = int2vector(text_supervise, text_len_supervise, uprate=args.uprate)
+        feature_supervise += np.random.randn(*feature_supervise.shape)/args.noise
         batch_time = time()
         global_step = 0
+
+        # for _ in range(500):
+        #     np.random.seed(1)
+        #     text_G = sess.run(iter_text)
+        #     text_lens_G = get_batch_length(text_G)
+        #     feature_text, text_lens_G = int2vector(text_G, text_lens_G, uprate=args.uprate)
+        #     feature_text += np.random.randn(*feature_text.shape)/args.noise
+        #     loss_G, loss_G_supervise, _ = sess.run(gan.list_train_G,
+        #          feed_dict={gan.list_G_pl[0]:feature_text,
+        #                     gan.list_G_pl[1]:text_lens_G,
+        #                     gan.list_G_pl[2]:feature_supervise,
+        #                     gan.list_G_pl[3]:feature_len_supervise,
+        #                     gan.list_G_pl[4]:text_supervise,
+        #                     gan.list_G_pl[5]:text_len_supervise})
+        #     saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=0, write_meta_graph=True)
+
         while global_step < 99999999:
 
             # global_step, lr_G, lr_D = sess.run([tensor_global_step0, gan.learning_rate_G, gan.learning_rate_D])
@@ -94,9 +111,8 @@ def train():
 
             # text_supervise = sess.run(iter_supervise)
             # text_len_supervise = get_batch_length(text_supervise)
-            # feature_text_supervise = int2vector(text_supervise)
-            # feature_text_supervise += np.random.randn(*feature_text_supervise.shape)/args.noise
-            # feature_text = feature_text_supervise
+            # feature_supervise, feature_len_supervise = int2vector(text_supervise, text_len_supervise, uprate=args.uprate)
+            # feature_supervise += np.random.randn(*feature_supervise.shape)/args.noise
 
             # supervise
             # for _ in range(1):
@@ -107,25 +123,27 @@ def train():
             #                                     G.list_pl[3]:text_len_supervise})
 
             # generator input
+            np.random.seed(1)
             text_G = sess.run(iter_text)
             text_lens_G = get_batch_length(text_G)
-            feature_text = int2vector(text_G)
+            feature_text, text_lens_G = int2vector(text_G, text_lens_G, uprate=args.uprate)
             feature_text += np.random.randn(*feature_text.shape)/args.noise
             loss_G, loss_G_supervise, _ = sess.run(gan.list_train_G,
                  feed_dict={gan.list_G_pl[0]:feature_text,
                             gan.list_G_pl[1]:text_lens_G,
-                            gan.list_G_pl[2]:feature_text_supervise,
-                            gan.list_G_pl[3]:text_len_supervise,
+                            gan.list_G_pl[2]:feature_supervise,
+                            gan.list_G_pl[3]:feature_len_supervise,
                             gan.list_G_pl[4]:text_supervise,
                             gan.list_G_pl[5]:text_len_supervise})
             # loss_G = loss_G_supervise = 0
 
             # discriminator input
             for _ in range(3):
+                np.random.seed(2)
                 text_G = sess.run(iter_text)
                 text_lens_G = get_batch_length(text_G)
-                feature_text = int2vector(text_G)
-                feature_text += np.random.randn(*feature_text.shape)/args.noise
+                feature_G, feature_lens_G = int2vector(text_G, text_lens_G, uprate=args.uprate)
+                feature_G += np.random.randn(*feature_G.shape)/args.noise
 
                 text_D = sess.run(iter_text)
                 text_lens_D = get_batch_length(text_D)
@@ -133,8 +151,8 @@ def train():
                 loss_D, loss_D_res, loss_D_text, loss_gp, _ = sess.run(gan.list_train_D,
                         feed_dict={gan.list_D_pl[0]:text_D,
                                    gan.list_D_pl[1]:text_lens_D,
-                                   gan.list_G_pl[0]:feature_text,
-                                   gan.list_G_pl[1]:text_lens_G})
+                                   gan.list_G_pl[0]:feature_G,
+                                   gan.list_G_pl[1]:feature_lens_G})
             # loss_D_res = loss_D_text = loss_gp = 0
             # shape_text = [0,0,0]
 
@@ -161,19 +179,21 @@ def train():
 
             if global_step % args.save_step == args.save_step - 1:
                 saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step, write_meta_graph=True)
-
-            if global_step % args.dev_step == args.dev_step - 1:
+                print('saved model as',  str(args.dir_checkpoint) + '/model-' + str(global_step))
+            # if global_step % args.dev_step == args.dev_step - 1:
+            if global_step % args.dev_step == 1:
+                np.random.seed(5)
                 text_G_dev = sess.run(iter_text_dev)
                 text_lens_G_dev = get_batch_length(text_G_dev)
-                feature_text_dev = int2vector(text_G_dev)
-                feature_text_dev += np.random.randn(*feature_text_dev.shape)/args.noise
+                feature_dev, feature_lens_G_dev = int2vector(text_G_dev, text_lens_G_dev, uprate=args.uprate)
+                feature_dev += np.random.randn(*feature_dev.shape)/args.noise
 
                 list_res = []; list_ref = []; list_length = []
                 process = 0
                 while process < len(dataset_text_dev):
                     _, samples, len_samples = sess.run(G_infer.run_list,
-                                                        feed_dict={G_infer.list_pl[0]:feature_text_dev,
-                                                                   G_infer.list_pl[1]:text_lens_G_dev})
+                                                        feed_dict={G_infer.list_pl[0]:feature_dev,
+                                                                   G_infer.list_pl[1]:feature_lens_G_dev})
                     list_res.append(samples)
                     list_ref.append(text_G_dev)
                     list_length.append(text_lens_G_dev)
@@ -183,15 +203,21 @@ def train():
                 all_ref = np.concatenate(list_ref, 0)
                 all_length = np.concatenate(list_length, 0)
 
-                acc = accuracy(all_res, all_ref, all_length)
-                print('dev accuracy: {:.2f}%'.format(acc*100.0))
+                if args.uprate == 1.0:
+                    acc = accuracy(all_res, all_ref, all_length)
+                    print('dev accuracy: {:.2f}%'.format(acc*100.0))
+                else:
+                    cer_dist, cer_len = batch_cer(
+                        result=all_res,
+                        reference=all_ref)
+                    cer = cer_dist / cer_len
+                    print('dev cer: {:.2f}%'.format(cer*100.0))
 
             # if global_step % args.decode_step == args.decode_step - 1:
             if global_step % args.decode_step == args.decode_step - 1:
                 logits, samples, len_samples = sess.run(G_infer.run_list,
-                                                feed_dict={G_infer.list_pl[0]:feature_text_dev,
-                                                           G_infer.list_pl[1]:text_lens_G_dev})
-
+                                                feed_dict={G_infer.list_pl[0]:feature_dev,
+                                                           G_infer.list_pl[1]:feature_lens_G_dev})
                 list_res_txt = array_idx2char(samples, args.idx2token, seperator=' ')
                 list_ref_txt = array_idx2char(text_G_dev, args.idx2token, seperator=' ')
 
@@ -209,12 +235,14 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-m', type=str, dest='mode', default='train')
     parser.add_argument('--name', type=str, dest='name', default=None)
-    parser.add_argument('--gpu', type=str, dest='gpu', default=0)
+    parser.add_argument('--gpu', type=str, dest='gpu', default=None)
     parser.add_argument('-c', type=str, dest='config')
 
     param = parser.parse_args()
 
-    print('CUDA_VISIBLE_DEVICES: ', args.gpus)
+    if param.gpu:
+        print('CUDA_VISIBLE_DEVICES: ', args.gpus)
+        args.gpus = param.gpu
 
     if param.mode == 'train':
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus

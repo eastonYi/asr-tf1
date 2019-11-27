@@ -122,7 +122,7 @@ class GAN:
             # D loss greadient penalty
             # idx = tf.random.uniform(
             #     (), maxval=(self.args.text_batch_size-self.args.batch_size), dtype=tf.int32)
-            gp = 0.1 * self.D.gradient_penalty(
+            gp = 10.0 * self.D.gradient_penalty(
                 # real=feature_text[idx:idx+4],
                 real=feature_text[0:tf.shape(logits_G_un)[0]],
                 fake=tf.nn.softmax(logits_G_un, -1),
@@ -315,9 +315,16 @@ class Conditional_GAN(GAN):
             # G loss
             # loss_G_supervise = tf.constant(0.0)
             logits_G, len_decoded = self.G(feature_supervise, len_feature_supervise, reuse=True)
-            loss_supervise = self.G.ce_loss(logits_G, label, len_label)
+            if self.args.uprate == 1.0:
+                loss_supervise = self.G.ce_loss(logits_G, label, len_label)
+            elif self.args.uprate > 1.0:
+                loss_supervise = self.G.ctc_loss(
+                    logits=logits_G,
+                    len_logits=len_decoded,
+                    labels=label,
+                    len_labels=len_label)
             loss_supervise = tf.reduce_mean(loss_supervise, -1)
-            logits_G_un, len_decoded = self.G(feature, len_feature, reuse=True)
+            logits_G_un, len_decoded = self.G(feature, len_feature, shrink=True, reuse=True)
 
             # D loss fake
             logits_G_un = batch3D_pad_to(logits_G_un, length=self.args.max_label_len)
@@ -407,8 +414,8 @@ class Conditional_GAN(GAN):
         #         decay_rate=0.5,
         #         decay_steps=self.args.decay_steps)
         self.optimizer_G = tf.train.AdamOptimizer(self.learning_rate_G,
-                                                   beta1=0.1,
-                                                   beta2=0.5,
+                                                   beta1=0.01,
+                                                   beta2=0.1,
                                                    epsilon=1e-9)
         self.optimizer_D = tf.train.AdamOptimizer(self.learning_rate_D,
                                                    beta1=0.1,

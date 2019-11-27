@@ -26,18 +26,18 @@ class FCDecoder(Decoder):
             return logits, align, len_logits
         else:
             batch_size = tf.shape(logits)[0]
-            # dim_output = tf.shape(logits)[-1]
-            dim_output = self.args.dim_output
-            align = tf.argmax(logits, -1)
             blank_id = tf.convert_to_tensor(dim_output - 1, dtype=tf.int64)
-            len_labels = tf.reduce_sum(tf.cast(tf.not_equal(align, blank_id), tf.int32), -1)
+            frames_mark = tf.not_equal(tf.argmax(logits, -1), blank_id)
+            prev = tf.concat([tf.ones([batch_size, 1], tf.int64) * blank_id, tf.argmax(logits, -1)[:, :-1]], 1)
+            flag_norepeat = tf.not_equal(prev, tf.argmax(logits, -1))
+            flag = tf.logical_and(flag_norepeat, frames_mark)
+            flag = tf.logical_and(flag, tf.sequence_mask(len_encoded, tf.shape(logits)[1], tf.bool))
+            len_labels = tf.reduce_sum(tf.cast(flag, tf.int32), -1)
             max_label_len = tf.reduce_max(len_labels)
             logits_output = tf.zeros([0, max_label_len, dim_output], tf.float32)
 
             def sent(b, logits_output):
-                _logits = logits[b, :, :]
-                align = tf.argmax(_logits, -1)
-                logit = tf.gather(_logits, tf.where(tf.not_equal(align, blank_id))[:, 0])
+                logit = tf.gather(logits[b, :, :], tf.where(flag[b, :])[:, 0])
                 pad_logit = tf.zeros([tf.reduce_max([max_label_len - len_labels[b], 0]), dim_output])
                 logits_padded = tf.concat([logit, pad_logit], 0)[:max_label_len, :]
                 logits_output = tf.concat([logits_output, logits_padded[None, :]], 0)

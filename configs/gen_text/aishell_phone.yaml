@@ -1,5 +1,5 @@
 dirs:
-    exp: aishell
+    exp: gen_text
     train:
         scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-5k.scp
         trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-5k.phone67
@@ -19,12 +19,13 @@ dirs:
     text:
         # data: /mnt/lustre/xushuang2/easton/data/aishell/phone/text-120k.phone67
         data: /home/user/easton/data/AISHELL/phone/text-120k.phone67
-        supervise: /home/user/easton/data/AISHELL/phone/text-50.phone67
+        supervise: /home/user/easton/data/AISHELL/phone/text-5k.phone67
+        # supervise: /mnt/lustre/xushuang2/easton/data/aishell/phone/text-120k.phone67
         dev: /home/user/easton/data/AISHELL/phone/dev-14k.phone67
     type: test
     # vocab: /mnt/lustre/xushuang2/easton/data/aishell/phone/phones_67+1.vocab
     vocab: /home/user/easton/data/AISHELL/phone/phones_67+1.vocab
-    # checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc2/no_norm_5k/checkpoint/model-799
+    checkpoint_G: /home/user/easton/projects/asr-tf1/exps/gen_text/aishell_phone/checkpoint/model-599
     # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer/test2/checkpoint
 
 # data:
@@ -55,11 +56,12 @@ model_D:
     max_feat_len: 1000
 
 noise: 4.0
+uprate: 3.0
 # lr_type: constant_learning_rate
 optimizer: adam
 # lr: 0.0001
-rate: 0.1
-lr_G: 0.001
+rate: 0.6
+lr_G: 0.0001
 lr_D: 0.001
 supervise_G_rate: 1.0
 warmup_steps: 5000
@@ -68,7 +70,7 @@ decay_steps: 8000
 
 decode_step: 100
 dev_step: 100
-save_step: 1000
+save_step: 100
 num_epochs: 999
 
 # gpus: '0,1,2,3'
@@ -77,8 +79,9 @@ num_epochs: 999
 gpus: '0'
 batch_size: 160
 beam_size: 1
-text_batch_size: 200
+text_batch_size: 100
 max_label_len: 20
+num_supervised: 1000
 num_batch_tokens: 20000
 bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
 

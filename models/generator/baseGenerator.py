@@ -4,7 +4,7 @@ import sys
 from collections import namedtuple
 
 from ..utils.gradientTools import average_gradients, handle_gradients
-from ..utils.tools import choose_device, smoothing_cross_entropy, warmup_exponential_decay
+from ..utils.tools import choose_device, smoothing_cross_entropy, dense_sequence_to_sparse
 from ..lstmModel import LSTM_Model
 from ..utils.blocks import normal_conv, block
 
@@ -18,9 +18,9 @@ class Generator():
         self.global_step = global_step
         self.batch_size = int(args.text_batch_size/args.num_gpus)
         self.dim_input = args.model.dim_input
-        self.max_input_len = args.max_label_len
+        self.max_input_len = int(args.max_label_len * args.uprate)
         self.num_filters = args.model.num_filters
-        self.dim_hidden = hidden
+        self.hidden_size = hidden
         self.num_blocks = num_blocks
         self.args = args
         self.training = training
@@ -31,17 +31,58 @@ class Generator():
         self.run_list = self.build_graph() if training else self.build_infer_graph()
         self.trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
 
-    def __call__(self, seq_input, sen_len, reuse=False):
+    # def __call__(self, seq_input, sen_len, reuse=False):
+#
+        # with tf.variable_scope(self.name, reuse=reuse):
+        #     seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
+        #     x = tf.layers.dense(seq_input, self.hidden_size, use_bias=False)
+        #     for i in range(2):
+        #         x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
+        #         x = tf.nn.relu(x)
+        #     logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
+        #
+        # return logits, sen_len
 
+    def __call__(self, seq_input, sen_len, shrink=False, reuse=False):
+        """
+        seq_input: [b, seq_len, dim_input]
+        conv generator
+        """
         with tf.variable_scope(self.name, reuse=reuse):
             seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
-            x = tf.layers.dense(seq_input, self.dim_hidden, use_bias=False)
+            x = tf.layers.dense(seq_input, self.hidden_size, use_bias=False)
+            # x = tf.reshape(x, [-1, self.max_input_len, self.hidden_size, 1])
+            # for i in range(5):
+            #     x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
+            #     x = tf.nn.relu(x)
+            # for i in range(1):
+            #     x = block(x, self.num_filters, i, kernel=(7,9))
+            #     # x = normal_conv(
+            #     #     inputs=x,
+            #     #     filter_num=self.num_filters,
+            #     #     kernel=(7,9),
+            #     #     stride=(1,1),
+            #     #     padding='SAME',
+            #     #     use_relu=True,
+            #     #     name="res_"+str(i),
+            #     #     norm_type=None
+            #     #     )
             for i in range(2):
-                x = tf.layers.dense(x, units=self.dim_hidden, use_bias=True)
+                inputs = x
+                x = tf.layers.conv1d(x, filters=self.hidden_size, kernel_size=3, strides=1, padding='same')
                 x = tf.nn.relu(x)
-            logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
+                x = tf.layers.conv1d(x, filters=self.hidden_size, kernel_size=3, strides=1, padding='same')
+                x = tf.nn.relu(x)
+                x = inputs + 0.3*x
 
-        return logits, sen_len
+            x = tf.reshape(x, [-1, self.max_input_len, self.hidden_size])
+            for i in range(3):
+                x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
+                x = tf.nn.relu(x)
+            # logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
+            logits, len_logits = self.final_layer(x, sen_len, self.args.dim_output, shrink)
+
+        return logits, len_logits
 
     # def __call__(self, seq_input, sen_len, reuse=False):
     #     """
@@ -50,24 +91,27 @@ class Generator():
     #     """
     #     with tf.variable_scope(self.name, reuse=reuse):
     #         seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
-    #         x = tf.layers.dense(seq_input, self.dim_hidden, use_bias=False)
-    #         x = tf.reshape(x, [self.batch_size, self.max_input_len, self.dim_hidden, 1])
+    #         x = tf.layers.dense(seq_input, self.hidden_size, use_bias=False)
+    #         x = tf.reshape(x, [-1, self.max_input_len, self.hidden_size, 1])
     #         # for i in range(5):
-    #         #     x = tf.layers.dense(x, units=self.dim_hidden, use_bias=True)
+    #         #     x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
     #         #     x = tf.nn.relu(x)
-    #         for i in range(3):
-    #             # x = block(x, num_filters, i, kernel=(3,9))
-    #             x = normal_conv(
-    #                 inputs=x,
-    #                 filter_num=self.num_filters,
-    #                 kernel=(7,9),
-    #                 stride=(1,1),
-    #                 padding='SAME',
-    #                 use_relu=True,
-    #                 name="res_"+str(i),
-    #                 norm_type=None
-    #                 )
-    #         x = tf.reshape(x, [self.batch_size, self.max_input_len, self.dim_hidden*self.num_filters])
+    #         for i in range(2):
+    #             x = block(x, self.num_filters, i, kernel=(7,9))
+    #             # x = normal_conv(
+    #             #     inputs=x,
+    #             #     filter_num=self.num_filters,
+    #             #     kernel=(7,9),
+    #             #     stride=(1,1),
+    #             #     padding='SAME',
+    #             #     use_relu=True,
+    #             #     name="res_"+str(i),
+    #             #     norm_type=None
+    #             #     )
+    #         x = tf.reshape(x, [-1, self.max_input_len, self.hidden_size*self.num_filters])
+    #         for i in range(2):
+    #             x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
+    #             x = tf.nn.relu(x)
     #         logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
     #
     #     return logits, sen_len
@@ -77,7 +121,8 @@ class Generator():
         len_features = tensors_input.seq_len[id_gpu]
 
         with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
-            logits, len_logits = self(features, len_features, reuse=reuse)
+            logits, len_logits = self(features, len_features, shrink=(not self.training),  reuse=reuse)
+            # logits, len_logits = self(features, len_features, shrink=False,  reuse=reuse)
 
             if self.training:
                 labels = tensors_input.labels[id_gpu]
@@ -123,6 +168,13 @@ class Generator():
 
         logits, len_logits = self.build_single_graph(0, self.list_gpu_devices[0], tensors_input)
         decoded = tf.argmax(logits, -1)
+        # decoded_sparse = self.ctc_decode(logits, len_logits)
+        # decoded = tf.sparse_to_dense(
+        #     sparse_indices=decoded_sparse.indices,
+        #     output_shape=decoded_sparse.dense_shape,
+        #     sparse_values=decoded_sparse.values,
+        #     default_value=0,
+        #     validate_indices=True)
 
         return logits, decoded, len_logits
 
@@ -170,6 +222,36 @@ class Generator():
 
         return loss
 
+
+    def ctc_loss(self, logits, len_logits, labels, len_labels):
+        """
+        No valid path found: It is possible that no valid path is found if the
+        activations for the targets are zero.
+        """
+        labels_sparse = dense_sequence_to_sparse(
+            labels,
+            len_labels)
+        ctc_loss = tf.nn.ctc_loss(
+            labels_sparse,
+            logits,
+            sequence_length=len_logits,
+            # ctc_merge_repeated=False,
+            ctc_merge_repeated=True,
+            ignore_longer_outputs_than_inputs=True,
+            time_major=False)
+
+        return ctc_loss
+
+    def ctc_decode(self, logits, len_logits):
+        logits_timeMajor = tf.transpose(logits, [1, 0, 2])
+
+        decoded_sparse = tf.to_int32(tf.nn.ctc_greedy_decoder(
+            logits_timeMajor,
+            len_logits,
+            merge_repeated=True)[0][0])
+
+        return decoded_sparse
+
     def trainable_variables(self, scope=None):
         '''get a list of the models's variables'''
         scope = scope if scope else self.name
@@ -200,3 +282,48 @@ class Generator():
         # self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
 
         # self.optimizer = tf.train.RMSPropOptimizer(self.learning_rate)
+
+    @staticmethod
+    def final_layer(encoded, len_encoded, dim_output, shrink=False):
+        logits = tf.layers.dense(
+            inputs=encoded,
+            units=dim_output,
+            activation=None,
+            use_bias=False,
+            name='fully_connected')
+
+        if not shrink:
+            logits *= tf.tile(tf.expand_dims(tf.sequence_mask(len_encoded, tf.shape(logits)[1], tf.float32), -1),
+                              [1, 1, dim_output])
+
+            return logits, len_encoded
+        else:
+            # logits *= tf.tile(tf.expand_dims(tf.sequence_mask(len_encoded, tf.shape(logits)[1], tf.float32), -1),
+            #                   [1, 1, dim_output])
+            batch_size = tf.shape(logits)[0]
+            blank_id = tf.convert_to_tensor(dim_output - 1, dtype=tf.int64)
+            frames_mark = tf.not_equal(tf.argmax(logits, -1), blank_id)
+            prev = tf.concat([tf.ones([batch_size, 1], tf.int64) * blank_id, tf.argmax(logits, -1)[:, :-1]], 1)
+            flag_norepeat = tf.not_equal(prev, tf.argmax(logits, -1))
+            flag = tf.logical_and(flag_norepeat, frames_mark)
+            flag = tf.logical_and(flag, tf.sequence_mask(len_encoded, tf.shape(logits)[1], tf.bool))
+            len_labels = tf.reduce_sum(tf.cast(flag, tf.int32), -1)
+            max_label_len = tf.reduce_max(len_labels)
+            logits_output = tf.zeros([0, max_label_len, dim_output], tf.float32)
+
+            def sent(b, logits_output):
+                logit = tf.gather(logits[b, :, :], tf.where(flag[b, :])[:, 0])
+                pad_logit = tf.zeros([tf.reduce_max([max_label_len - len_labels[b], 0]), dim_output])
+                logits_padded = tf.concat([logit, pad_logit], 0)[:max_label_len, :]
+                logits_output = tf.concat([logits_output, logits_padded[None, :]], 0)
+
+                return b+1, logits_output
+
+            _, logits_output = tf.while_loop(
+            cond=lambda b, *_: tf.less(b, batch_size),
+            body=sent,
+            loop_vars=[0, logits_output],
+            shape_invariants=[tf.TensorShape([]),
+                              tf.TensorShape([None, None, dim_output])])
+
+            return logits_output, len_labels

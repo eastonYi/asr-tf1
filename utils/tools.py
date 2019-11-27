@@ -545,23 +545,39 @@ def align2bound(align):
     return np.array(list_stamps)
 
 
-def int2vector(seqs, hidden_size=10):
+def int2vector(seqs, seq_len, hidden_size=10, uprate=1.0):
     """
     m = np.array([[2,3,4],
                   [5,6,0]])
     int2vector(m, 5)
     """
     list_res = []
-    for seq in seqs:
-        lilst_seq = []
-        for m in seq:
+    list_length = []
+    for seq, l in zip(seqs, seq_len):
+        max_len = int(len(seq) * uprate)
+        list_seq = []
+        length = 0
+        for m in seq[:l]:
             list_feat = []
+            # org frame
             for i in np.arange(hidden_size-1, -1, -1):
                 dec = np.power(2, i)
                 p = m // dec
                 m -= p * dec
                 list_feat.append(p)
-            lilst_seq.append(list_feat)
-        list_res.append(lilst_seq)
+            list_seq.append(list_feat)
+            length += 1
 
-    return np.array(list_res, np.float32)
+            # repeat frames
+            for _ in range(int(np.random.random()*uprate)):
+                list_seq.append(list_feat)
+                length += 1
+
+        # pad frames
+        for _ in range(max_len - len(list_seq)):
+            list_seq.append([0]*hidden_size)
+
+        list_res.append(list_seq[:max_len])
+        list_length.append(length)
+
+    return np.array(list_res, np.float32), list_length
