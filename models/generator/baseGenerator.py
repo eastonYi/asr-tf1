@@ -79,7 +79,6 @@ class Generator():
             for i in range(3):
                 x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
                 x = tf.nn.relu(x)
-            # logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
             logits, len_logits = self.final_layer(x, sen_len, self.args.dim_output, shrink)
 
         return logits, len_logits
@@ -121,8 +120,8 @@ class Generator():
         len_features = tensors_input.seq_len[id_gpu]
 
         with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
-            logits, len_logits = self(features, len_features, shrink=(not self.training),  reuse=reuse)
-            # logits, len_logits = self(features, len_features, shrink=False,  reuse=reuse)
+            # logits, len_logits = self(features, len_features, shrink=(not self.training),  reuse=reuse)
+            logits, len_logits = self(features, len_features, shrink=False,  reuse=reuse)
 
             if self.training:
                 labels = tensors_input.labels[id_gpu]

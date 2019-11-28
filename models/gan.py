@@ -83,6 +83,7 @@ class GAN:
                 len_logits=len_decoded,
                 labels=labels,
                 len_labels=len_labels)
+
             cp_loss = self.args.model.decoder.confidence_penalty * confidence_penalty(logits_G, len_decoded)
             loss_G_supervise = loss_G_supervise + cp_loss
             loss_G_supervise = tf.reduce_mean(loss_G_supervise)
@@ -122,7 +123,7 @@ class GAN:
             # D loss greadient penalty
             # idx = tf.random.uniform(
             #     (), maxval=(self.args.text_batch_size-self.args.batch_size), dtype=tf.int32)
-            gp = 10.0 * self.D.gradient_penalty(
+            gp = 0.1 * self.D.gradient_penalty(
                 # real=feature_text[idx:idx+4],
                 real=feature_text[0:tf.shape(logits_G_un)[0]],
                 fake=tf.nn.softmax(logits_G_un, -1),
@@ -323,6 +324,8 @@ class Conditional_GAN(GAN):
                     len_logits=len_decoded,
                     labels=label,
                     len_labels=len_label)
+            if self.args.model.decoder.confidence_penalty:
+                loss_supervise += self.args.model.decoder.confidence_penalty * confidence_penalty(logits_G, len_decoded)
             loss_supervise = tf.reduce_mean(loss_supervise, -1)
             logits_G_un, len_decoded = self.G(feature, len_feature, shrink=True, reuse=True)
 

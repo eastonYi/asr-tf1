@@ -83,7 +83,7 @@ def accuracy(res, ref, length):
     total = np.sum(length)
     num_correct = 0
     for s, f, l in zip(res, ref, length):
-        num_correct += np.sum(np.equal(s, f)[:l])
+        num_correct += np.sum(np.equal(s[:l], f[:l]))
     acc = num_correct / total
 
     return acc
