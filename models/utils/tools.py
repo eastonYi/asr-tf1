@@ -498,12 +498,14 @@ def tensor2state(tensor):
 def size_variables():
     total_size = 0
     all_weights = {v.name: v for v in tf.trainable_variables()}
+    print('='*160)
     for v_name in sorted(list(all_weights)):
         v = all_weights[v_name]
         v_size = int(np.prod(np.array(v.shape.as_list())))
-        logging.info("Weight    %s\tshape    %s\tsize    %d" % (v.name[:-2].ljust(80), str(v.shape).ljust(20), v_size))
+        print("Weight    %s\tshape    %s\tsize    %d" % (v.name[:-2].ljust(80), str(v.shape).ljust(20), v_size))
         total_size += v_size
-    logging.info("Total trainable variables size: %d" % total_size)
+    print('='*160)
+    print("Total trainable variables size: %d" % total_size)
 
 
 def smoothing_cross_entropy(logits, labels, vocab_size, confidence):

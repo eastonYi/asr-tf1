@@ -244,6 +244,25 @@ def conv(inputs, filters, kernel_size, **kwargs):
   return conv_internal(tf.layers.conv2d, inputs, filters, kernel_size, **kwargs)
 
 
+def blstm(hidden_output, len_feas, num_hidden, name):
+    num_hidden /= 2
+
+    with tf.variable_scope(name):
+        f_cell = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(num_hidden)
+        b_cell = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(num_hidden)
+
+        x, _ = tf.nn.bidirectional_dynamic_rnn(
+            cell_fw=f_cell,
+            cell_bw=b_cell,
+            inputs=hidden_output,
+            dtype=tf.float32,
+            time_major=False,
+            sequence_length=len_feas)
+        x = tf.concat(x, 2)
+
+    return x
+
+
 def dense_without_vars(inputs,
                        units,
                        activation=tf.identity,

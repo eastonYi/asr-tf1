@@ -123,7 +123,7 @@ class GAN:
             # D loss greadient penalty
             # idx = tf.random.uniform(
             #     (), maxval=(self.args.text_batch_size-self.args.batch_size), dtype=tf.int32)
-            gp = 0.1 * self.D.gradient_penalty(
+            gp = 1.0 * self.D.gradient_penalty(
                 # real=feature_text[idx:idx+4],
                 real=feature_text[0:tf.shape(logits_G_un)[0]],
                 fake=tf.nn.softmax(logits_G_un, -1),

@@ -6,7 +6,7 @@ from collections import namedtuple
 from ..utils.gradientTools import average_gradients, handle_gradients
 from ..utils.tools import choose_device, smoothing_cross_entropy, dense_sequence_to_sparse
 from ..lstmModel import LSTM_Model
-from ..utils.blocks import normal_conv, block
+from ..utils.blocks import normal_conv, block, blstm
 
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format='%(levelname)s(%(filename)s:%(lineno)d): %(message)s')
 
@@ -14,14 +14,16 @@ logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format='%(levelname)
 class Generator():
     num_Instances = 0
     num_Model = 0
-    def __init__(self, global_step, hidden, num_blocks, training, args, name='Sequence_Dependent_Generator'):
+    def __init__(self, global_step, training, args, name='Sequence_Dependent_Generator'):
         self.global_step = global_step
         self.batch_size = int(args.text_batch_size/args.num_gpus)
         self.dim_input = args.model.dim_input
         self.max_input_len = int(args.max_label_len * args.uprate)
         self.num_filters = args.model.num_filters
-        self.hidden_size = hidden
-        self.num_blocks = num_blocks
+        self.hidden_size = args.model.hidden_size
+        self.num_blocks = args.model.num_blocks
+        self.num_fc = args.model.num_fc
+        self.dropout = args.model.dropout
         self.args = args
         self.training = training
         self.name = name
@@ -32,16 +34,16 @@ class Generator():
         self.trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
 
     # def __call__(self, seq_input, sen_len, reuse=False):
-#
-        # with tf.variable_scope(self.name, reuse=reuse):
-        #     seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
-        #     x = tf.layers.dense(seq_input, self.hidden_size, use_bias=False)
-        #     for i in range(2):
-        #         x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
-        #         x = tf.nn.relu(x)
-        #     logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
-        #
-        # return logits, sen_len
+    #
+    #     with tf.variable_scope(self.name, reuse=reuse):
+    #         seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
+    #         x = tf.layers.dense(seq_input, self.hidden_size, use_bias=False)
+    #         for i in range(2):
+    #             x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
+    #             x = tf.nn.relu(x)
+    #         logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
+    #
+    #     return logits, sen_len
 
     def __call__(self, seq_input, sen_len, shrink=False, reuse=False):
         """
@@ -50,7 +52,8 @@ class Generator():
         """
         with tf.variable_scope(self.name, reuse=reuse):
             seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
-            x = tf.layers.dense(seq_input, self.hidden_size, use_bias=False)
+            x = tf.layers.dense(seq_input, self.num_filters, use_bias=False)
+            # x = seq_input
             # x = tf.reshape(x, [-1, self.max_input_len, self.hidden_size, 1])
             # for i in range(5):
             #     x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
@@ -67,18 +70,20 @@ class Generator():
             #     #     name="res_"+str(i),
             #     #     norm_type=None
             #     #     )
-            for i in range(2):
+            for i in range(self.num_blocks):
                 inputs = x
-                x = tf.layers.conv1d(x, filters=self.hidden_size, kernel_size=3, strides=1, padding='same')
+                x = tf.layers.conv1d(x, filters=self.num_filters, kernel_size=3, strides=1, padding='same')
                 x = tf.nn.relu(x)
-                x = tf.layers.conv1d(x, filters=self.hidden_size, kernel_size=3, strides=1, padding='same')
+                x = tf.layers.conv1d(x, filters=self.num_filters, kernel_size=3, strides=1, padding='same')
                 x = tf.nn.relu(x)
                 x = inputs + 0.3*x
 
-            x = tf.reshape(x, [-1, self.max_input_len, self.hidden_size])
-            for i in range(3):
+            # x = tf.reshape(x, [-1, self.max_input_len, self.num_filters])
+            for i in range(self.num_fc):
                 x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
                 x = tf.nn.relu(x)
+                x = tf.layers.dropout(x, rate=self.dropout, training=self.training)
+
             logits, len_logits = self.final_layer(x, sen_len, self.args.dim_output, shrink)
 
         return logits, len_logits
@@ -114,6 +119,27 @@ class Generator():
     #         logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
     #
     #     return logits, sen_len
+
+
+    # def __call__(self, seq_input, sen_len, shrink=False, reuse=False):
+    #     """
+    #     seq_input: [b, seq_len, dim_input]
+    #     conv generator
+    #     """
+    #     with tf.variable_scope(self.name, reuse=reuse):
+    #         seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
+    #         # x = tf.layers.dense(seq_input, self.num_filters, use_bias=False)
+    #         x = seq_input
+    #         for i in range(self.num_blocks):
+    #             x = blstm(x, sen_len, self.hidden_size, 'blstm_'+str(i))
+    #
+    #         # x = tf.reshape(x, [-1, self.max_input_len, self.num_filters])
+    #         for i in range(self.num_fc):
+    #             x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
+    #             x = tf.nn.relu(x)
+    #         logits, len_logits = self.final_layer(x, sen_len, self.args.dim_output, shrink)
+    #
+    #     return logits, len_logits
 
     def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
         features = tensors_input.seq_input[id_gpu]

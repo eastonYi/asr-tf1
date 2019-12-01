@@ -5,6 +5,8 @@ from collections import defaultdict
 from random import shuffle
 from pathlib import Path
 from abc import ABCMeta, abstractmethod
+from pypinyin import pinyin, Style
+from .dataProcess import load_vocab
 
 from .dataProcess import audio2vector, process_raw_feature, down_sample, splice
 from .tools import align2stamp, align2bound, size_bucket_to_put
@@ -630,11 +632,30 @@ class TextDataSet(LMDataSet):
             with open(filename) as f:
                 for line in f:
                     line = line.strip().split()
-                    if len(line) > self.args.max_label_len:
-                        continue
                     text_ids = [self.token2idx[word] for word in line]
 
-                    yield text_ids
+                    yield text_ids[:self.args.max_label_len]
+
+
+class PinyinDataSet(TextDataSet):
+
+    def __init__(self, list_files, args, _shuffle):
+        self.pinyin2idx, self.idx2pinyin = load_vocab(args.dirs.vocab_pinyin)
+        super().__init__(list_files, args, _shuffle)
+
+    def __iter__(self):
+        """
+        (Pdb) i
+        [1,18,2,36,1,17,7,9,9,6,25,28,3,5,14,1,11,32,24,16,26,22,3,1,16,15,1,18,8,3,1,4,1]
+        """
+        for filename in self.list_files:
+            with open(filename) as f:
+                for line in f:
+                    line = line.strip()
+                    pinyin_ids = [self.pinyin2idx[i[0]] for i in pinyin(line.replace(' ', ''), style=Style.TONE3)]
+                    text_ids = [self.token2idx[word] for word in line.split()]
+
+                    yield pinyin_ids[:self.args.max_label_len], text_ids[:self.args.max_label_len]
 
 
 class SimpleDataLoader:
@@ -768,7 +789,6 @@ class DataLoader(SimpleDataLoader):
                 yield self.padding_list_seq_with_labels(*batch)
                 caches[bucket] = [[], [], 0]
                 # logging.info('empty the bucket {}'.format(bucket))
-
 
 class ASRDataLoader(DataLoader):
     def __init__(self, dataset, args, feat, label, batch_size, num_loops, num_thread=4, size_queue=2000):
