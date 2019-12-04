@@ -5,6 +5,39 @@ from tensorflow.contrib.rnn import GRUCell, LayerNormBasicLSTMCell, DropoutWrapp
 allow_defun = True
 
 
+def shrink_layer(encoded, len_encoded, logits, dim_hidden):
+
+    batch_size = tf.shape(encoded)[0]
+    blank_id = tf.cast(tf.shape(logits)[-1] - 1, tf.int64)
+    frames_mark = tf.not_equal(tf.argmax(logits, -1), blank_id)
+    prev = tf.concat([tf.ones([batch_size, 1], tf.int64) * blank_id, tf.argmax(logits, -1)[:, :-1]], 1)
+    flag_norepeat = tf.not_equal(prev, tf.argmax(logits, -1))
+    flag = tf.logical_and(flag_norepeat, frames_mark)
+    flag = tf.logical_and(flag, tf.sequence_mask(len_encoded, tf.shape(logits)[1], tf.bool))
+    len_labels = tf.reduce_sum(tf.cast(flag, tf.int32), -1)
+    max_label_len = tf.reduce_max(len_labels)
+    hidden_output = tf.zeros([0, max_label_len, dim_hidden], tf.float32)
+
+    def sent(b, hidden_output):
+        hidden = tf.gather(encoded[b, :, :], tf.where(flag[b, :])[:, 0])
+        pad = tf.zeros([tf.reduce_max([max_label_len - len_labels[b], 0]), dim_hidden])
+        hidden_padded = tf.concat([hidden, pad], 0)[:max_label_len, :]
+        hidden_output = tf.concat([hidden_output, hidden_padded[None, :]], 0)
+
+        return b+1, hidden_output
+
+    _, hidden_output = tf.while_loop(
+    cond=lambda b, *_: tf.less(b, batch_size),
+    body=sent,
+    loop_vars=[0, hidden_output],
+    shape_invariants=[tf.TensorShape([]),
+                      tf.TensorShape([None, None, dim_hidden])])
+
+    len_decoded = len_labels
+
+    return hidden_output, len_decoded
+
+
 def normal_conv(inputs, filter_num, kernel, stride, padding, use_relu, name,
                 w_initializer=None, norm_type="batch"):
     with tf.variable_scope(name):

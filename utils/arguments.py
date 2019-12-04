@@ -90,17 +90,17 @@ if args.dirs.type == 'scp':
 elif args.dirs.type == 'csv':
     from .dataset import ASR_csv_DataSet
     dataset_train = ASR_csv_DataSet(
-        list_files=args.dirs.train.list_files,
+        f_csv=args.dirs.train.wav_csv,
         args=args,
         _shuffle=True,
         transform=False)
     dataset_dev = ASR_csv_DataSet(
-        list_files=args.dirs.dev.list_files,
+        f_csv=args.dirs.dev.wav_csv,
         args=args,
         _shuffle=False,
         transform=False)
     dataset_test = ASR_csv_DataSet(
-        list_files=args.dirs.test.list_files,
+        f_csv=args.dirs.test.wav_csv,
         args=args,
         _shuffle=False,
         transform=True)
@@ -135,7 +135,7 @@ try:
     args.data.dev_size = TFData.read_tfdata_info(args.dirs.dev.tfdata)['size_dataset']
     args.data.dim_input = args.data.dim_feature * \
             (args.data.right_context + args.data.left_context +1) *\
-            (2 if args.data.add_delta else 1)
+            (3 if args.data.add_delta else 1)
 except:
     print("have not converted to tfdata yet: ")
 
@@ -161,6 +161,8 @@ args.model.encoder.type = encoder
 # try:
 if args.model.decoder.type == 'FC':
     from models.decoders.fc_decoder import FCDecoder as decoder
+elif args.model.decoder.type == 'conv_decoder':
+    from models.decoders.conv_decoder import CONV_Decoder as decoder
 elif args.model.decoder.type == 'classifier':
     from models.decoders.classifier import FCDecoder as decoder
 elif args.model.decoder.type == 'transformer_decoder':
@@ -181,6 +183,8 @@ elif args.model.type == 'ctcModel':
     from models.ctcModel import CTCModel as Model
 elif args.model.type == 'ctcModel_EODM':
     from models.ctcModel_EODM import CTCModel as Model
+elif args.model.type == 'Ectc_Docd':
+    from models.Ectc_Docd import Ectc_Docd as Model
 elif args.model.type == 'classifier':
     from models.classifier import Classifier as Model
 elif args.model.type == 'transformer':

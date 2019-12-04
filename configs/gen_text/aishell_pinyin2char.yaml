@@ -19,8 +19,8 @@ dirs:
     text:
         # data: /mnt/lustre/xushuang2/easton/data/aishell/phone/text-120k.phone67
         data: /home/user/easton/data/AISHELL/char/train-120k.char
-        supervise: /home/user/easton/data/AISHELL/char/train-1k.char
-        # supervise: /home/user/easton/data/AISHELL/char/train-120k.char
+        # supervise: /home/user/easton/data/AISHELL/char/train-1k.char
+        supervise: /home/user/easton/data/AISHELL/char/train-120k.char
         dev: /home/user/easton/data/AISHELL/char/dev-14k.char
     type: test
     vocab_pinyin: /home/user/easton/data/AISHELL/char/pinyin_1383.txt
@@ -57,13 +57,13 @@ model_D:
     num_fc: 2
     max_feat_len: 1000
 
-noise: 10.0
+noise: 1000.0
 uprate: 1.0
 # lr_type: constant_learning_rate
 optimizer: adam
 # lr: 0.0001
 rate: 0.5
-lr_G: 0.001
+lr_G: 0.0005
 lr_D: 0.001
 supervise_G_rate: 1.0
 warmup_steps: 5000

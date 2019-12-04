@@ -83,7 +83,7 @@ def train():
         feature_supervise += np.random.randn(*feature_supervise.shape)/args.noise
 
         # supervise
-        for _ in range(200):
+        for _ in range(500):
             sess.run(G.run_list,
                      feed_dict={G.list_pl[0]:feature_supervise,
                                 G.list_pl[1]:feature_len_supervise,
@@ -98,10 +98,10 @@ def train():
             # global_step, lr_G, lr_D = sess.run([tensor_global_step0, gan.learning_rate_G, gan.learning_rate_D])
             global_step, lr_G = sess.run([tensor_global_step0, G.learning_rate])
 
-            # pinyin_supervise, text_supervise = sess.run(iter_supervise)
-            # pinyin_len_supervise = get_batch_length(pinyin_supervise)
-            # feature_supervise, feature_len_supervise = int2vector(pinyin_supervise, pinyin_len_supervise, hidden_size=args.model.dim_input , uprate=args.uprate)
-            # feature_supervise += np.random.randn(*feature_supervise.shape)/args.noise
+            pinyin_supervise, text_supervise = sess.run(iter_supervise)
+            pinyin_len_supervise = get_batch_length(pinyin_supervise)
+            feature_supervise, feature_len_supervise = int2vector(pinyin_supervise, pinyin_len_supervise, hidden_size=args.model.dim_input , uprate=args.uprate)
+            feature_supervise += np.random.randn(*feature_supervise.shape)/args.noise
 
             # supervise
             # for _ in range(1):
@@ -126,23 +126,23 @@ def train():
             # loss_G = loss_G_supervise = 0
 
             # discriminator input
-            for _ in range(3):
-                # np.random.seed(2)
-                pinyin_G, text_G = sess.run(iter_train)
-                pinyin_lens_G = get_batch_length(pinyin_G)
-                feature_G, feature_lens_G = int2vector(pinyin_G, pinyin_lens_G, hidden_size=args.model.dim_input, uprate=args.uprate)
-                feature_G += np.random.randn(*feature_G.shape)/args.noise
-
-                pinyin_D, text_D = sess.run(iter_train)
-                text_lens_D = get_batch_length(text_D)
-                shape_text = text_D.shape
-                loss_D, loss_D_res, loss_D_text, loss_gp, _ = sess.run(gan.list_train_D,
-                        feed_dict={gan.list_D_pl[0]:text_D,
-                                   gan.list_D_pl[1]:text_lens_D,
-                                   gan.list_G_pl[0]:feature_G,
-                                   gan.list_G_pl[1]:feature_lens_G})
-            # loss_D_res = loss_D_text = loss_gp = 0
-            # shape_text = [0,0,0]
+            # for _ in range(5):
+            #     # np.random.seed(2)
+            #     pinyin_G, text_G = sess.run(iter_train)
+            #     pinyin_lens_G = get_batch_length(pinyin_G)
+            #     feature_G, feature_lens_G = int2vector(pinyin_G, pinyin_lens_G, hidden_size=args.model.dim_input, uprate=args.uprate)
+            #     feature_G += np.random.randn(*feature_G.shape)/args.noise
+            #
+            #     pinyin_D, text_D = sess.run(iter_train)
+            #     text_lens_D = get_batch_length(text_D)
+            #     shape_text = text_D.shape
+            #     loss_D, loss_D_res, loss_D_text, loss_gp, _ = sess.run(gan.list_train_D,
+            #             feed_dict={gan.list_D_pl[0]:text_D,
+            #                        gan.list_D_pl[1]:text_lens_D,
+            #                        gan.list_G_pl[0]:feature_G,
+            #                        gan.list_G_pl[1]:feature_lens_G})
+            loss_D_res = loss_D_text = loss_gp = 0
+            shape_text = [0,0,0]
 
             # loss_D_res = - loss_G
             # loss_G = loss_G_supervise = 0.0

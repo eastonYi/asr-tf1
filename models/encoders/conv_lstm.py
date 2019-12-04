@@ -11,10 +11,10 @@ class CONV_LSTM(Encoder):
 
     def encode(self, features, len_features):
 
-        num_hidden = self.args.model.encoder.num_hidden
-        use_residual = self.args.model.encoder.use_residual
-        dropout = self.args.model.encoder.dropout
+        hidden_size = self.args.model.encoder.hidden_size
         num_filters = self.args.model.encoder.num_filters
+        dropout = self.args.model.dropout
+        use_residual = False
         size_feat = self.args.data.dim_input
 
         # x = tf.expand_dims(features, -1)
@@ -50,7 +50,7 @@ class CONV_LSTM(Encoder):
         outputs = self.blstm(
             hidden_output=outputs,
             len_feas=len_seq,
-            num_hidden=num_hidden,
+            hidden_size=hidden_size,
             use_residual=use_residual,
             dropout=dropout,
             name='blstm_1')
@@ -59,7 +59,7 @@ class CONV_LSTM(Encoder):
         outputs = self.blstm(
             hidden_output=outputs,
             len_feas=len_seq,
-            num_hidden=num_hidden,
+            hidden_size=hidden_size,
             use_residual=use_residual,
             dropout=dropout,
             name='blstm_2')
@@ -68,7 +68,7 @@ class CONV_LSTM(Encoder):
         outputs = self.blstm(
             hidden_output=outputs,
             len_feas=len_seq,
-            num_hidden=num_hidden,
+            hidden_size=hidden_size,
             use_residual=use_residual,
             dropout=dropout,
             name='blstm_3')
@@ -77,14 +77,14 @@ class CONV_LSTM(Encoder):
         outputs = self.blstm(
             hidden_output=outputs,
             len_feas=len_seq,
-            num_hidden=num_hidden,
+            hidden_size=hidden_size,
             use_residual=use_residual,
             dropout=dropout,
             name='blstm_4')
         outputs, len_seq = self.pooling(outputs, len_seq, 'SAME', 4)
 
         pad_mask = tf.tile(tf.expand_dims(tf.sequence_mask(len_seq, tf.shape(outputs)[1], tf.float32), -1),
-                           [1, 1, num_hidden])
+                           [1, 1, hidden_size])
         outputs *= pad_mask
 
         return outputs, len_seq
@@ -106,12 +106,12 @@ class CONV_LSTM(Encoder):
         return output
 
     @staticmethod
-    def blstm(hidden_output, len_feas, num_hidden, use_residual, dropout, name):
-        num_hidden /= 2
+    def blstm(hidden_output, len_feas, hidden_size, use_residual, dropout, name):
+        hidden_size /= 2
 
         with tf.variable_scope(name):
-            f_cell = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(num_hidden)
-            b_cell = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(num_hidden)
+            f_cell = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(hidden_size)
+            b_cell = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(hidden_size)
 
             x, _ = tf.nn.bidirectional_dynamic_rnn(
                 cell_fw=f_cell,
@@ -128,12 +128,12 @@ class CONV_LSTM(Encoder):
         return x
 
     def pooling(self, x, len_sequence, type, name):
-        num_hidden = self.args.model.encoder.num_hidden
+        hidden_size = self.args.model.encoder.hidden_size
 
         x = tf.expand_dims(x, axis=2)
         x = self.normal_conv(
             x,
-            num_hidden,
+            hidden_size,
             (1, 1),
             (1, 1),
             'SAME',

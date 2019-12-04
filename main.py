@@ -81,8 +81,8 @@ def train():
         #     print(batch[0].shape)
 
         if args.dirs.checkpoint:
-            checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
-            saver.restore(sess, checkpoint)
+            # checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
+            saver.restore(sess, args.dirs.checkpoint)
 
         elif args.dirs.lm_checkpoint:
             lm_checkpoint = tf.train.latest_checkpoint(args.dirs.lm_checkpoint)
@@ -103,14 +103,14 @@ def train():
             progress = num_processed/args.data.train_size
 
             if global_step % 50 == 0:
-                logging.info('loss: {:.3f}\tbatch: {} lr:{:.6f} time:{:.2f}s {:.3f}% step: {}'.format(
-                              loss, shape_batch, lr, used_time, progress*100.0, global_step))
+                print('loss: {:.3f}\tbatch: {} lr:{:.6f} time:{:.2f}s {:.3f}% step: {}'.format(
+                    loss, shape_batch, lr, used_time, progress*100.0, global_step))
                 summary.summary_scalar('loss', loss, global_step)
                 summary.summary_scalar('lr', lr, global_step)
 
             if global_step % args.save_step == args.save_step - 1:
                 saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step, write_meta_graph=True)
-                print('saved model in',  str(args.dir_checkpoint))
+                print('saved model in',  str(args.dir_checkpoint)+'/model-'+str(global_step))
 
             if global_step % args.dev_step == args.dev_step -1:
                 cer, wer = dev(
@@ -344,6 +344,8 @@ if __name__ == '__main__':
 
     param = parser.parse_args()
 
+    if param.gpu:
+        args.gpus = param.gpu
     print('CUDA_VISIBLE_DEVICES: ', args.gpus)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
 

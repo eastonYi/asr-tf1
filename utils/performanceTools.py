@@ -43,6 +43,7 @@ def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0,
             eos_idx=eos_idx,
             min_idx=min_idx,
             max_idx=max_idx)
+
         _wer = batch_wer_dist/batch_wer_len
         total_wer_dist += batch_wer_dist
         total_wer_len += batch_wer_len

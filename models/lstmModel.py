@@ -28,7 +28,7 @@ class LSTM_Model(object):
 
         # Build graph
         self.list_run = list(self.build_graph() if training else self.build_infer_graph())
-        self.trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
+        # self.trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
 
     def build_graph(self):
         # cerate input tensors in the cpu

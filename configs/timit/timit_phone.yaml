@@ -1,50 +1,52 @@
 dirs:
     exp: timit_phone
+    # train:
+    #     wav_csv: /home/user/easton/data/TIMIT/train200_phone39.csv
+    #     tfdata: /home/user/easton/data/TIMIT/tfdata/train200_feats_13_0_1_3
     train:
-        trans: /data/sxu/easton/projects/kaldi-2019/egs/timit/try1/data/train/text
-        wav_scp: /home/user/easton/data/TIMIT/kaldi_gentrain_wav.scp
-        tfdata: /data/sxu/easton/data/TIMIT/tfdata/train_feats_13_0_1_3
-    train_supervise:
-        trans: /data/sxu/easton/projects/kaldi-2019/egs/timit/try1/data/train/text_200
-        wav_scp: /data/sxu/easton/data/TIMIT/train200_wav.scp
-        tfdata: /data/sxu/easton/data/TIMIT/tfdata/train200_feats_13_0_1_3
+        wav_csv: /home/user/easton/data/TIMIT/train_phone39.csv
+        tfdata: /home/user/easton/data/TIMIT/tfdata/train_feats_13_0_1_3
     dev:
-        trans: /data/sxu/easton/projects/kaldi-2019/egs/timit/try1/data/test/text
-        wav_scp: /data/sxu/easton/data/TIMIT/test_wav.scp
-        tfdata: /data/sxu/easton/data/TIMIT/tfdata/test_feats_13_0_1_3
+        wav_csv: /home/user/easton/data/TIMIT/test_phone39.csv
+        tfdata: /home/user/easton/data/TIMIT/tfdata/test_feats_13_0_1_3
+    test:
+        wav_csv: /home/user/easton/data/TIMIT/test_phone39.csv
+        tfdata: /home/user/easton/data/TIMIT/tfdata/test_feats_13_0_1_3
     text:
-        # data: /mnt/lustre/xushuang2/easton/data/aishell/phone/text-120k.phone67
-        data: /home/user/easton/data/AISHELL/char/train-120k.char
-        supervise: /home/user/easton/data/AISHELL/char/train-1k.char
-        # supervise: /home/user/easton/data/AISHELL/char/train-120k.char
-        dev: /home/user/easton/data/AISHELL/char/dev-14k.char
-    type: test
-    vocab_pinyin: /home/user/easton/data/AISHELL/char/pinyin_1383.txt
-    vocab: /home/user/easton/data/AISHELL/char/char_2817.vocab
+        data: /home/user/easton/data/TIMIT/train_phone.txt
+    type: csv
+    vocab: /home/user/easton/data/TIMIT/phone39+1.vocab
     # checkpoint_G: /home/user/easton/projects/asr-tf1/exps/gen_text/aishell_phone/2k_noise2.5/checkpoint/model-10999
-    # checkpoint_G: /home/user/easton/projects/asr-tf1/exps/gen_text/aishell_phone/100_fc/checkpoint/model-1099
     # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer/test2/checkpoint
 
-# data:
-#     featType: mfcc
-#     left_context: 0
-#     right_context: 0
-#     downsample: 1
-#     add_delta: False
-#     unit: word
+data:
+    featType: mfcc
+    dim_raw_input: 13
+    left_context: 0
+    right_context: 0
+    downsample: 1
+    add_delta: True
+    unit: word
 
 model:
+    # type: Ectc_Docd
     type: ctcModel
-    dim_input: 10
-    num_filters: 128
-    num_blocks: 1
-    hidden_size: 256
-    num_fc: 3
     dropout: 0.05
     encoder:
-        type: conv2
+        # type: conv2
+        type: conv_lstm
+        num_filters: 64
+        num_blocks: 2
+        hidden_size: 256
+        num_fc: 2
     decoder:
+        # type: conv_decoder
         type: FC
+        num_filters: 128
+        num_blocks: 1
+        hidden_size: 256
+        num_fc: 3
+        label_smoothing: 0.95
 
 model_D:
     type: clm
@@ -53,22 +55,19 @@ model_D:
     num_fc: 2
     max_feat_len: 1000
 
-noise: 5.0
-uprate: 1.0
 # lr_type: constant_learning_rate
 optimizer: adam
 # lr: 0.0001
 rate: 0.2
-lr_G: 0.001
-lr_D: 0.001
-supervise_G_rate: 1.0
+lr_G: 0.0001
+lr_D: 0.0001
 warmup_steps: 5000
 peak: 0.001
 decay_steps: 8000
 
-decode_step: 100
-dev_step: 100
-save_step: 100
+decode_step: 200
+dev_step: 200
+save_step: 200
 num_epochs: 999
 
 # gpus: '0,1,2,3'
@@ -79,9 +78,9 @@ batch_size: 160
 beam_size: 1
 text_batch_size: 200
 max_label_len: 20
-num_supervised: 1000
-num_batch_tokens: 20000
-bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
+num_supervised: 200
+num_batch_tokens: 60000
+bucket_boundaries: 261,313,375,507,778
 
 lambda_lm: 0.0
 lambda_l2: 0.0

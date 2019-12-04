@@ -34,7 +34,7 @@ class DataSet:
 
 
 class ASRDataSet(DataSet):
-    def __init__(self,file,args,_shuffle,transform):
+    def __init__(self, file, args, _shuffle,transform):
         self.file = file
         self.args = args
         self.transform = transform
@@ -60,15 +60,15 @@ class ASRDataSet(DataSet):
 
 
 class ASR_csv_DataSet(ASRDataSet):
-    def __init__(self, list_files, args, _shuffle, transform):
-        super().__init__(list_files, args, _shuffle, transform)
-        self.list_utterances = self.gen_utter_list(list_files)
+    def __init__(self, f_csv, args, _shuffle, transform):
+        super().__init__(f_csv, args, _shuffle, transform)
+        self.list_utterances = self.gen_utter_list(f_csv)
         if _shuffle:
             self.shuffle_utts()
 
     def __getitem__(self, idx):
         utterance = self.list_utterances[idx]
-        wav, seq_label = utterance.strip().split(',')
+        wav, seq_label, _ = utterance.strip().split(',')
         fea = audio2vector(wav, self.args.data.dim_raw_input)
         if self.transform:
             fea = process_raw_feature(fea, self.args)
@@ -83,11 +83,10 @@ class ASR_csv_DataSet(ASRDataSet):
         return sample
 
     @staticmethod
-    def gen_utter_list(list_files):
+    def gen_utter_list(f_csv):
         list_utter = []
-        for file in list_files:
-            with open(file) as f:
-                list_utter.extend(f.readlines())
+        with open(f_csv) as f:
+            list_utter.extend(f.readlines())
         return list_utter
 
     def shuffle_utts(self):

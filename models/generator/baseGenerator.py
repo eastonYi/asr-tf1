@@ -45,6 +45,33 @@ class Generator():
     #
     #     return logits, sen_len
 
+    # def __call__(self, seq_input, sen_len, shrink=False, reuse=False):
+    #     """
+    #     seq_input: [b, seq_len, dim_input]
+    #     conv generator
+    #     """
+    #     with tf.variable_scope(self.name, reuse=reuse):
+    #         seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
+    #         x = tf.layers.dense(seq_input, self.num_filters, use_bias=False)
+    #
+    #         for i in range(self.num_blocks):
+    #             inputs = x
+    #             x = tf.layers.conv1d(x, filters=self.num_filters, kernel_size=3, strides=1, padding='same')
+    #             x = tf.nn.relu(x)
+    #             x = tf.layers.conv1d(x, filters=self.num_filters, kernel_size=3, strides=1, padding='same')
+    #             x = tf.nn.relu(x)
+    #             x = inputs + 0.3*x
+    #
+    #         # x = tf.reshape(x, [-1, self.max_input_len, self.num_filters])
+    #         for i in range(self.num_fc):
+    #             x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
+    #             x = tf.nn.relu(x)
+    #             x = tf.layers.dropout(x, rate=self.dropout, training=self.training)
+    #
+    #         logits, len_logits = self.final_layer(x, sen_len, self.args.dim_output, shrink)
+    #
+    #     return logits, len_logits
+
     def __call__(self, seq_input, sen_len, shrink=False, reuse=False):
         """
         seq_input: [b, seq_len, dim_input]
@@ -52,73 +79,19 @@ class Generator():
         """
         with tf.variable_scope(self.name, reuse=reuse):
             seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
-            x = tf.layers.dense(seq_input, self.num_filters, use_bias=False)
-            # x = seq_input
-            # x = tf.reshape(x, [-1, self.max_input_len, self.hidden_size, 1])
-            # for i in range(5):
-            #     x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
-            #     x = tf.nn.relu(x)
-            # for i in range(1):
-            #     x = block(x, self.num_filters, i, kernel=(7,9))
-            #     # x = normal_conv(
-            #     #     inputs=x,
-            #     #     filter_num=self.num_filters,
-            #     #     kernel=(7,9),
-            #     #     stride=(1,1),
-            #     #     padding='SAME',
-            #     #     use_relu=True,
-            #     #     name="res_"+str(i),
-            #     #     norm_type=None
-            #     #     )
-            for i in range(self.num_blocks):
-                inputs = x
-                x = tf.layers.conv1d(x, filters=self.num_filters, kernel_size=3, strides=1, padding='same')
-                x = tf.nn.relu(x)
-                x = tf.layers.conv1d(x, filters=self.num_filters, kernel_size=3, strides=1, padding='same')
-                x = tf.nn.relu(x)
-                x = inputs + 0.3*x
+            # x = tf.layers.dense(seq_input, self.hidden_size, use_bias=False)
+            x = seq_input
+            for i in range(1):
+                x = blstm(x, sen_len, 64, 'blstm_'+str(i))
 
-            # x = tf.reshape(x, [-1, self.max_input_len, self.num_filters])
-            for i in range(self.num_fc):
+            for i in range(2):
                 x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
                 x = tf.nn.relu(x)
                 x = tf.layers.dropout(x, rate=self.dropout, training=self.training)
 
             logits, len_logits = self.final_layer(x, sen_len, self.args.dim_output, shrink)
 
-        return logits, len_logits
-
-    # def __call__(self, seq_input, sen_len, reuse=False):
-    #     """
-    #     seq_input: [b, seq_len, dim_input]
-    #     conv generator
-    #     """
-    #     with tf.variable_scope(self.name, reuse=reuse):
-    #         seq_input *= tf.sequence_mask(sen_len, maxlen=self.max_input_len, dtype=tf.float32)[:, :, None]
-    #         x = tf.layers.dense(seq_input, self.hidden_size, use_bias=False)
-    #         x = tf.reshape(x, [-1, self.max_input_len, self.hidden_size, 1])
-    #         # for i in range(5):
-    #         #     x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
-    #         #     x = tf.nn.relu(x)
-    #         for i in range(2):
-    #             x = block(x, self.num_filters, i, kernel=(7,9))
-    #             # x = normal_conv(
-    #             #     inputs=x,
-    #             #     filter_num=self.num_filters,
-    #             #     kernel=(7,9),
-    #             #     stride=(1,1),
-    #             #     padding='SAME',
-    #             #     use_relu=True,
-    #             #     name="res_"+str(i),
-    #             #     norm_type=None
-    #             #     )
-    #         x = tf.reshape(x, [-1, self.max_input_len, self.hidden_size*self.num_filters])
-    #         for i in range(2):
-    #             x = tf.layers.dense(x, units=self.hidden_size, use_bias=True)
-    #             x = tf.nn.relu(x)
-    #         logits = tf.layers.dense(x, units=self.args.dim_output, use_bias=False)
-    #
-    #     return logits, sen_len
+        return logits, sen_len
 
 
     # def __call__(self, seq_input, sen_len, shrink=False, reuse=False):

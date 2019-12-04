@@ -36,7 +36,7 @@ class GAN:
 
         with tf.name_scope(self.name):
             for id_gpu, name_gpu in enumerate(self.list_gpu_devices):
-                loss_D, loss_G, gradients_D, gradients_G, (loss_G_supervise, loss_D_res, loss_D_text, loss_gp) = \
+                loss_D, loss_G, gradients_D, gradients_G, (ctc_loss, ce_loss, loss_D_res, loss_D_text, loss_gp) = \
                     self.build_single_graph(id_gpu, name_gpu, tensors_input)
                 loss_D_step.append(loss_D); loss_G_step.append(loss_G)
                 tower_D_grads.append(gradients_D); tower_G_grads.append(gradients_G)
@@ -59,7 +59,7 @@ class GAN:
             self.__class__.num_Instances, self.__class__.__name__))
 
         return (loss_D, loss_D_res, loss_D_text, loss_gp, op_optimize_D), \
-                (loss_G, loss_G_supervise, op_optimize_G), \
+                (loss_G, ctc_loss, ce_loss, op_optimize_G), \
                 (tensors_input.shape_feature, tensors_input.shape_unfeature)
 
     def build_single_graph(self, id_gpu, name_gpu, tensors_input):
@@ -77,18 +77,26 @@ class GAN:
 
         with tf.device(name_gpu):
             # G loss
-            logits_G, _, len_decoded = self.G(feature, len_features, shrink=False, reuse=True)
-            loss_G_supervise = self.G.ctc_loss(
-                logits=logits_G,
-                len_logits=len_decoded,
+            (logits_ctc, logits_ocd), _, (len_logits_ctc, len_logits_ocd) = self.G(
+                feature, len_features, reuse=True)
+            ctc_loss = self.G.ctc_loss(
+                logits=logits_ctc,
+                len_logits=len_logits_ctc,
                 labels=labels,
                 len_labels=len_labels)
+            len_labels = tf.where(len_labels<len_logits_ocd, len_labels, len_logits_ocd)
+            # len_labels = tf.where(len_labels>tf.ones_like(len_labels), len_labels, tf.ones_like(len_labels))
+            min_len = tf.reduce_min([tf.shape(logits_ocd)[1], tf.shape(labels)[1]])
 
-            cp_loss = self.args.model.decoder.confidence_penalty * confidence_penalty(logits_G, len_decoded)
-            loss_G_supervise = loss_G_supervise + cp_loss
+            ce_loss = self.G.ce_loss(
+                logits=logits_ocd[:, :min_len, :],
+                labels=labels[:, :min_len],
+                len_labels=len_labels)
+            # loss_G_supervise = ctc_loss + ce_loss
+            loss_G_supervise = ce_loss
             loss_G_supervise = tf.reduce_mean(loss_G_supervise)
-            # loss_G_supervise = tf.constant(0.0)
-            logits_G_un, _, len_decoded = self.G(unfeature, len_unfeatures, shrink=True, reuse=True)
+
+            (_, logits_G_un), _, (_, len_decoded) = self.G(unfeature, len_unfeatures, reuse=True)
             # sample_mask = tf.cast(tf.equal(len_unlabel, len_decoded), tf.float32)
             # sample_mask = tf.zeros_like(len_label, dtype=tf.float32)
             # sample_mask = tf.ones_like(len_unlabel, dtype=tf.float32)
@@ -96,35 +104,15 @@ class GAN:
             # D loss fake
             logits_G_un = batch3D_pad_to(logits_G_un, length=self.args.max_label_len)
             logits_D_res = self.D(tf.nn.softmax(logits_G_un, -1), len_decoded, reuse=True)
-            # logits_G_un = tf.zeros([tf.shape(logits_G_un)[0], self.args.max_label_len, self.args.dim_output], tf.float32)
-            # len_decoded = tf.ones([tf.shape(logits_G_un)[0]], tf.int32) * self.args.max_label_len
-            # logits_D_res = self.D(logits_G_un, len_decoded, reuse=True)
             loss_D_res = tf.reduce_mean(logits_D_res, 0)
-
-            # zeros = tf.zeros(tf.shape(logits_D_res), tf.float32)
-            # ones = tf.ones(tf.shape(logits_D_res), tf.float32)
-            # # loss_D_res = tf.math.pow(logits_D_res - zeros, 2)
-            # loss_D_res = tf.nn.relu(logits_D_res - zeros)
-            # loss_D_res = tf.reduce_sum(loss_D_res*sample_mask) / tf.reduce_sum(sample_mask)
-            # loss_G_res = tf.nn.relu(ones - logits_D_res)
-            # loss_G_res = tf.reduce_sum(loss_G_res*sample_mask) / tf.reduce_sum(sample_mask)
 
             # D loss real
             feature_text = tf.one_hot(text, self.args.dim_output)
             logits_D_text = self.D(feature_text, len_text, reuse=True)
             loss_D_text = -tf.reduce_mean(logits_D_text, 0)
 
-            # ones = tf.ones(tf.shape(logits_D_text), tf.float32)
-            # zeros = tf.zeros(tf.shape(logits_D_text), tf.float32)
-            # # loss_D_text = tf.math.pow(logits_D_text - ones, 2)
-            # loss_D_text = tf.nn.relu(ones - logits_D_text)
-            # loss_D_text = tf.reduce_mean(loss_D_text)
-
             # D loss greadient penalty
-            # idx = tf.random.uniform(
-            #     (), maxval=(self.args.text_batch_size-self.args.batch_size), dtype=tf.int32)
             gp = 1.0 * self.D.gradient_penalty(
-                # real=feature_text[idx:idx+4],
                 real=feature_text[0:tf.shape(logits_G_un)[0]],
                 fake=tf.nn.softmax(logits_G_un, -1),
                 len_inputs=len_decoded)
@@ -132,24 +120,19 @@ class GAN:
 
             # loss_D_res = tf.constant(0.0)
             loss_D = loss_D_res + loss_D_text +  gp
-            # loss_D = loss_D_res
-            # loss_G = -loss_D_res
-            loss_G = self.args.supervise_G_rate * loss_G_supervise - loss_D_res
-            # loss_D = loss_D_res + loss_D_text
-            # loss_G = loss_G_res
-            # loss_G = 0
+            loss_G = self.args.rate * loss_G_supervise - loss_D_res
 
             with tf.name_scope("gradients"):
                 gradients_D = self.optimizer_D.compute_gradients(
-                    loss_D, var_list=self.D.trainable_variables)
+                    loss_D, var_list=self.D.trainable_variables())
                 gradients_G = self.optimizer_G.compute_gradients(
-                    loss_G, var_list=self.G.trainable_variables)
+                    loss_G, var_list=self.G.trainable_variables())
 
         self.__class__.num_Model += 1
         logging.info('\tbuild {} on {} succesfully! total model number: {}'.format(
             self.__class__.__name__, name_gpu, self.__class__.num_Model))
 
-        return loss_D, loss_G, gradients_D, gradients_G, [loss_G_supervise, loss_D_res, loss_D_text, gp]
+        return loss_D, loss_G, gradients_D, gradients_G, [ctc_loss, ce_loss, loss_D_res, loss_D_text, gp]
 
     # def build_single_graph(self, id_gpu, name_gpu, tensors_input):
     #

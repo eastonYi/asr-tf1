@@ -8,8 +8,8 @@ from .decoder import Decoder
 class FCDecoder(Decoder):
     '''a fully connected decoder for the CTC architecture'''
 
-    def decode(self, encoded, len_encoded, decoder_input, shrink=False):
-        dim_output = self.args.dim_output
+    def __call__(self, encoded, len_encoded, decoder_input, shrink=False, dim_output=None):
+        dim_output = dim_output if dim_output else self.args.dim_output
         logits = tf.layers.dense(
             inputs=encoded,
             units=dim_output,

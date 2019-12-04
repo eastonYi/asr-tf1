@@ -34,7 +34,7 @@ class BLSTM(Encoder):
                 inputs=hidden_output,
                 index_layer=i)
 
-            if use_layernorm:
-                hidden_output = layer_normalize(hidden_output, i)
+            # if use_layernorm:
+            #     hidden_output = layer_normalize(hidden_output, i)
 
         return hidden_output

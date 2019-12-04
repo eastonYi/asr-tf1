@@ -5,15 +5,15 @@
   "uploadOnSave": true,
   "useAtomicWrites": true,
   "deleteLocal": true,
-  "hostname": "172.18.30.114",
+  "hostname": "172.18.36.30",
   "port": "22",
-  "target": "/home/user/easton/projects/asr-tf1",
+  "target": "/mnt/lustre/xushuang2/easton/projects/asr-tf1",
   "ignore": [
     ".remote-sync.json",
     ".git/**"
   ],
-  "username": "user",
+  "username": "xushuang2",
   "watch": [],
   "transport": "scp",
-  "password": "      "
+  "password": "xushuang2speech"
 }

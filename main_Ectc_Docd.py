@@ -15,8 +15,8 @@ from models.utils.tfData import TFReader, readTFRecord, TFData
 from utils.arguments import args
 from utils.dataset import ASRDataLoader, TextDataSet
 from utils.summaryTools import Summary
-from utils.performanceTools import dev, decode_test
-from utils.textTools import array_idx2char, array2text
+# from utils.performanceTools import dev, decode_test
+from utils.textTools import array_idx2char, array2text, batch_wer, batch_cer
 from utils.tools import get_batch_length
 
 
@@ -60,7 +60,10 @@ def train():
         decoder=args.model.decoder.type,
         training=False,
         args=args)
-    vars_G = G.trainable_variables
+    vars_G = G.trainable_variables()
+    vars_G_en = G.trainable_variables('Ectc_Docd/encoder')
+    vars_G_ctc = G.trainable_variables('Ectc_Docd/ctc_decoder')
+    vars_G_ocd = G.trainable_variables('Ectc_Docd/ocd_decoder')
 
     D = args.Model_D(
         tensor_global_step1,
@@ -75,6 +78,7 @@ def train():
 
     start_time = datetime.now()
     saver_G = tf.train.Saver(vars_G, max_to_keep=1)
+    saver_G_en = tf.train.Saver(vars_G_en + vars_G_ctc, max_to_keep=5)
     saver = tf.train.Saver(max_to_keep=15)
     summary = Summary(str(args.dir_log))
 
@@ -86,11 +90,15 @@ def train():
         dataloader_dev.sess = sess
         if args.dirs.checkpoint_G:
             saver_G.restore(sess, args.dirs.checkpoint_G)
+        if args.dirs.checkpoint_G_en:
+            saver_G_en.restore(sess, args.dirs.checkpoint_G_en)
 
-        for i in range(2000):
-            ctc_loss, *_ = sess.run(G.list_run)
-            if i % 400:
-                print('ctc_loss: {:.2f}'.format(ctc_loss))
+        # for i in range(500):
+        #     ctc_loss, *_ = sess.run(G.list_run)
+        #     if i % 100 == 0:
+        #         print('i: {} ctc_loss: {:.2f}'.format(i, ctc_loss))
+        # saver_G_en.save(get_session(sess), str(args.dir_checkpoint/'model_G_en'), global_step=0, write_meta_graph=True)
+        # print('saved model in',  str(args.dir_checkpoint)+'/model_G_en-0')
 
         batch_time = time()
         num_processed = 0
@@ -100,6 +108,9 @@ def train():
 
             global_step, lr_G, lr_D = sess.run([tensor_global_step0, gan.learning_rate_G, gan.learning_rate_D])
 
+            # supervised training
+            # loss, shape_batch, _, _ = sess.run(G.list_run)
+
             # untrain
             text = sess.run(iter_text)
             text_lens = get_batch_length(text)
@@ -108,7 +119,7 @@ def train():
             #                                               feed_dict={gan.list_pl[0]:text,
             #                                                          gan.list_pl[1]:text_lens})
             loss_D = loss_D_res = loss_D_text = loss_gp = 0
-            (loss_G, loss_G_supervise, _), (shape_feature, shape_unfeature) = \
+            (loss_G, ctc_loss, ce_loss, _), (shape_feature, shape_unfeature) = \
                 sess.run([gan.list_train_G, gan.list_feature_shape])
 
             num_processed += shape_feature[0]
@@ -119,8 +130,9 @@ def train():
             progress_unbatch = num_processed_unbatch/args.data.untrain_size
 
             if global_step % 20 == 0:
-                print('loss_supervise: {:.2f}, loss res|real|gp: {:.2f}|{:.2f}|{:.2f}\tbatch: {}|{}|{}\tlr:{:.1e}|{:.1e} {:.2f}s {:.1f}%|{:.1f}% step: {}'.format(
-                       loss_G_supervise, loss_D_res, loss_D_text, loss_gp, shape_feature, shape_unfeature, shape_text, lr_G, lr_D, used_time, progress*100.0, progress_unbatch*100.0, global_step))
+                # print('ctc loss: {:.2f}'.format(np.mean(loss)))
+                print('ctc_loss, ce_loss: {:.2f}|{:.2f}, loss res|real|gp: {:.2f}|{:.2f}|{:.2f}\tbatch: {}|{}|{}\tlr:{:.1e}|{:.1e} {:.2f}s {:.1f}%|{:.1f}% step: {}'.format(
+                       np.mean(ctc_loss), np.mean(ce_loss), loss_D_res, loss_D_text, loss_gp, shape_feature, shape_unfeature, shape_text, lr_G, lr_D, used_time, progress*100.0, progress_unbatch*100.0, global_step))
                 # summary.summary_scalar('loss_G', loss_G, global_step)
                 # summary.summary_scalar('loss_D', loss_D, global_step)
                 # summary.summary_scalar('lr_G', lr_G, global_step)
@@ -128,9 +140,12 @@ def train():
 
             if global_step % args.save_step == args.save_step - 1:
                 saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step, write_meta_graph=True)
+                print('saved model in',  str(args.dir_checkpoint)+'/model-'+str(global_step))
+                # saver_G_en.save(get_session(sess), str(args.dir_checkpoint/'model_G_en'), global_step=global_step, write_meta_graph=True)
+                # print('saved model in',  str(args.dir_checkpoint)+'/model_G_en-'+str(global_step))
 
-            # if global_step % args.dev_step == args.dev_step - 1:
-            if global_step % args.dev_step == 0:
+            if global_step % args.dev_step == args.dev_step - 1:
+            # if global_step % args.dev_step == 0:
                 cer, wer = dev(
                     step=global_step,
                     dataloader=dataloader_dev,
@@ -222,131 +237,97 @@ def infer():
         logging.info('dev CER {:.3f}:  WER: {:.3f}'.format(total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
 
 
-def infer_lm():
-    tensor_global_step = tf.train.get_or_create_global_step()
-    dataset_dev = args.dataset_test if args.dataset_test else args.dataset_dev
+def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0, max_idx=None):
+    start_time = time()
+    batch_time = time()
+    processed = 0
 
-    model_lm = args.Model_LM(
-        tensor_global_step,
-        training=False,
-        args=args.args_lm)
+    total_cer_ctc_dist = 0
+    total_cer_dist = 0
+    total_cer_len = 0
 
-    args.lm_obj = model_lm
-    saver_lm = tf.train.Saver(model_lm.variables())
+    total_wer_ctc_dist = 0
+    total_wer_dist = 0
+    total_wer_len = 0
 
-    args.top_scope = tf.get_variable_scope()   # top-level scope
-    args.lm_scope = model_lm.decoder.scope
+    for batch in dataloader:
+        if not batch: continue
+        dict_feed = {model.list_pl[0]: batch[0],
+                     model.list_pl[1]: batch[2]}
+        (decoded_ctc, decoded), shape_batch, _ = sess.run(model.list_run, feed_dict=dict_feed)
+        # import pdb; pdb.set_trace()
 
-    model_infer = args.Model(
-        tensor_global_step,
-        encoder=args.model.encoder.type,
-        decoder=args.model.decoder.type,
-        training=False,
-        args=args)
+        batch_cer_ctc_dist, batch_cer_len = batch_cer(
+            result=decoded_ctc,
+            reference=batch[1],
+            eos_idx=eos_idx,
+            min_idx=min_idx,
+            max_idx=max_idx)
+        batch_cer_dist, batch_cer_len = batch_cer(
+            result=decoded,
+            reference=batch[1],
+            eos_idx=eos_idx,
+            min_idx=min_idx,
+            max_idx=max_idx)
+        _cer_ctc = batch_cer_ctc_dist/batch_cer_len
+        _cer = batch_cer_dist/batch_cer_len
+        total_cer_ctc_dist += batch_cer_ctc_dist
+        total_cer_dist += batch_cer_dist
+        total_cer_len += batch_cer_len
 
-    saver = tf.train.Saver(model_infer.variables())
+        batch_wer_ctc_dist, batch_wer_len = batch_wer(
+            result=decoded_ctc,
+            reference=batch[1],
+            idx2token=idx2token,
+            unit=unit,
+            eos_idx=eos_idx,
+            min_idx=min_idx,
+            max_idx=max_idx)
+        batch_wer_dist, batch_wer_len = batch_wer(
+            result=decoded,
+            reference=batch[1],
+            idx2token=idx2token,
+            unit=unit,
+            eos_idx=eos_idx,
+            min_idx=min_idx,
+            max_idx=max_idx)
+        _wer_ctc = batch_wer_ctc_dist/batch_wer_len
+        _wer = batch_wer_dist/batch_wer_len
+        total_wer_ctc_dist += batch_wer_ctc_dist
+        total_wer_dist += batch_wer_dist
+        total_wer_len += batch_wer_len
 
-    size_variables()
+        used_time = time()-batch_time
+        batch_time = time()
+        processed += shape_batch[0]
+        progress = processed/len(dataloader)
+        sys.stdout.write('\rbatch CTC cer: {:.3f}\twer: {:.3f} \tbatch cer: {:.3f}\twer: {:.3f} batch: {}\t time:{:.2f}s {:.3f}%'.format(
+                      _cer_ctc, _wer_ctc, _cer, _wer, shape_batch, used_time, progress*100.0))
+        sys.stdout.flush()
 
-    config = tf.ConfigProto()
-    config.allow_soft_placement = True
-    config.gpu_options.allow_growth = True
-    config.log_device_placement = False
-    with tf.train.MonitoredTrainingSession(config=config) as sess:
-        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_init)
-        checkpoint_lm = tf.train.latest_checkpoint(args.dirs.lm_checkpoint)
-        saver.restore(sess, checkpoint)
-        saver_lm.restore(sess, checkpoint_lm)
+    used_time = time() - start_time
+    cer_ctc = total_cer_ctc_dist/total_cer_len
+    wer_ctc = total_wer_ctc_dist/total_wer_len
+    cer = total_cer_dist/total_cer_len
+    wer = total_wer_dist/total_wer_len
+    logging.warning('\n=====dev info, total used time {:.2f}h==== \nCTC WER: {:.4f}\tWER: {:.4f}\ntotal_wer_len: {}'.format(
+                 used_time/3600, wer_ctc, wer, total_wer_len))
 
-        total_cer_dist = 0
-        total_cer_len = 0
-        total_wer_dist = 0
-        total_wer_len = 0
-        with open(args.dir_model.name+'_decode.txt', 'w') as fw:
-        # with open('/mnt/lustre/xushuang/easton/projects/asr-tf/exp/aishell/lm_acc.txt', 'w') as fw:
-            for sample in tqdm(dataset_dev):
-                if not sample:
-                    continue
-                dict_feed = {model_infer.list_pl[0]: np.expand_dims(sample['feature'], axis=0),
-                             model_infer.list_pl[1]: np.array([len(sample['feature'])])}
-                sample_id, shape_batch, beam_decoded = sess.run(model_infer.list_run, feed_dict=dict_feed)
-                # decoded, sample_id, decoded_sparse = sess.run(model_infer.list_run, feed_dict=dict_feed)
-                res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, min_idx=0, max_idx=args.dim_output-1)
-                ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, min_idx=0, max_idx=args.dim_output-1)
-
-                list_res_char = list(res_txt)
-                list_ref_char = list(ref_txt)
-                list_res_word = res_txt.split()
-                list_ref_word = ref_txt.split()
-                cer_dist = ed.eval(list_res_char, list_ref_char)
-                cer_len = len(list_ref_char)
-                wer_dist = ed.eval(list_res_word, list_ref_word)
-                wer_len = len(list_ref_word)
-                total_cer_dist += cer_dist
-                total_cer_len += cer_len
-                total_wer_dist += wer_dist
-                total_wer_len += wer_len
-                if cer_len == 0:
-                    cer_len = 1000
-                    wer_len = 1000
-                if wer_dist/wer_len > 0:
-                    print('ref  ' , ref_txt)
-                    for i, decoded, score, rerank_score in zip(range(10), beam_decoded[0][0], beam_decoded[1][0], beam_decoded[2][0]):
-                        candidate = array2text(decoded, args.data.unit, args.idx2token, min_idx=0, max_idx=args.dim_output-1)
-                        print('res' ,i , candidate, score, rerank_score)
-                        fw.write('res: {}; ref: {}\n'.format(candidate, ref_txt))
-                    fw.write('id:\t{} \nres:\t{}\nref:\t{}\n\n'.format(sample['id'], res_txt, ref_txt))
-                logging.info('current cer: {:.3f}, wer: {:.3f};\tall cer {:.3f}, wer: {:.3f}'.format(
-                    cer_dist/cer_len, wer_dist/wer_len, total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
-        logging.info('dev CER {:.3f}:  WER: {:.3f}'.format(total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
+    return cer, wer
 
 
-def save(gpu, name=0):
-    from utils.IO import store_2d
+def decode_test(step, sample, model, sess, unit, idx2token, eos_idx=None, min_idx=0, max_idx=None):
+    # sample = dataset_dev[0]
+    dict_feed = {model.list_pl[0]: np.expand_dims(sample['feature'], axis=0),
+                 model.list_pl[1]: np.array([len(sample['feature'])])}
+    (decoded_ctc, decoded), shape_sample, _ = sess.run(model.list_run, feed_dict=dict_feed)
 
-    tensor_global_step = tf.train.get_or_create_global_step()
+    res_ctc_txt = array2text(decoded_ctc[0], unit, idx2token, eos_idx, min_idx, max_idx)
+    res_txt = array2text(decoded[0], unit, idx2token, eos_idx, min_idx, max_idx)
+    ref_txt = array2text(sample['label'], unit, idx2token, eos_idx, min_idx, max_idx)
 
-    embed = create_embedding(
-        name='embedding_table',
-        size_vocab=args.dim_output,
-        size_embedding=args.model.decoder.size_embedding)
-
-    model_infer = args.Model(
-        tensor_global_step,
-        encoder=args.model.encoder.type,
-        decoder=args.model.decoder.type,
-        embed_table_decoder=embed,
-        training=False,
-        args=args)
-
-    dataset_dev = args.dataset_test if args.dataset_test else args.dataset_dev
-
-    saver = tf.train.Saver(max_to_keep=15)
-
-    config = tf.ConfigProto()
-    config.allow_soft_placement = True
-    config.gpu_options.allow_growth = True
-    config.log_device_placement = False
-    with tf.train.MonitoredTrainingSession(config=config) as sess:
-        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_init)
-        saver.restore(sess, checkpoint)
-        if not name:
-            name = args.dir_model.name
-        with open('outputs/distribution_'+name+'.bin', 'wb') as fw, \
-            open('outputs/res_ref_'+name+'.txt', 'w') as fw2:
-        # with open('dev_sample.txt', 'w') as fw:
-            for i, sample in enumerate(tqdm(dataset_dev)):
-            # sample = dataset_dev[0]
-                if not sample: continue
-                dict_feed = {model_infer.list_pl[0]: np.expand_dims(sample['feature'], axis=0),
-                             model_infer.list_pl[1]: np.array([len(sample['feature'])])}
-                decoded, _, distribution = sess.run(model_infer.list_run, feed_dict=dict_feed)
-                store_2d(distribution[0], fw)
-                # pickle.dump(distribution[0], fw)
-                # [fw.write(' '.join(map(str, line))+'\n') for line in distribution[0]]
-                result_txt = array_idx2char(decoded, args.idx2token, seperator=' ')
-                ref_txt = array_idx2char(sample['label'], args.idx2token, seperator=' ')
-                fw2.write('{}_res: {}\n{}_ref: {}\n'.format(i, result_txt[0], i, ref_txt))
+    logging.warning('length: {}, \nres_ctc: \n{}\nres: \n{}\nref: \n{}'.format(
+        shape_sample[1], res_ctc_txt, res_txt, ref_txt))
 
 
 if __name__ == '__main__':
@@ -374,22 +355,9 @@ if __name__ == '__main__':
         if not args.dir_checkpoint.is_dir(): args.dir_checkpoint.mkdir()
 
     if param.mode == 'infer':
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
         logging.info('enter the INFERING phrase')
         infer()
-
-    elif param.mode == 'infer_lm':
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
-        logging.info('enter the INFERING phrase')
-        infer_lm()
-
-    elif param.mode == 'save':
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
-        logging.info('enter the SAVING phrase')
-        save(gpu=param.gpu, name=param.name)
-
     elif param.mode == 'train':
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
         logging.info('enter the TRAINING phrase')
         train()
 
