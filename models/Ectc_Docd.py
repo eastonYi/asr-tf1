@@ -40,12 +40,17 @@ class Ectc_Docd(CTCModel):
 
             with tf.variable_scope(decoder0.name or 'decoder0'):
                 logits_ctc, align, len_logits_ctc = decoder0(
-                    encoded, len_encoded, None, shrink=False, dim_output=self.args.dim_output)
+                    encoded, len_encoded, None,
+                    shrink=False,
+                    num_fc=self.args.model.decoder.num_fc,
+                    hidden_size=self.args.model.decoder.hidden_size,
+                    dim_output=self.args.dim_output)
 
+            # shrink layer
             encoded_shrunk, len_encoded_shrunk = shrink_layer(
-                encoded, len_encoded, logits_ctc, self.args.model.encoder.hidden_size)
-            encoded_shrunk = tf.stop_gradient(encoded_shrunk)
-            len_encoded_shrunk = tf.stop_gradient(len_encoded_shrunk)
+                encoded, len_encoded, logits_ctc, self.args.model.encoder.num_filters)
+            # encoded_shrunk = tf.stop_gradient(encoded_shrunk)
+            # len_encoded_shrunk = tf.stop_gradient(len_encoded_shrunk)
 
             with tf.variable_scope(decoder.name or 'decoder'):
                 logits_ocd, decoded, len_logits_ocd = decoder(encoded_shrunk, len_encoded_shrunk, None)
@@ -85,12 +90,11 @@ class Ectc_Docd(CTCModel):
                     labels=labels[:, :min_len],
                     len_labels=len_labels)
 
+                loss = ctc_loss
                 # loss = ctc_loss + ce_loss
-                loss = ce_loss
-                # loss = ctc_loss
 
                 if self.args.model.confidence_penalty:
-                    cp_loss = self.args.model.decoder.confidence_penalty * confidence_penalty(logits_ocd, len_logits_ocd)
+                    cp_loss = self.args.model.confidence_penalty * confidence_penalty(logits_ctc, len_logits_ctc)
                     assert cp_loss.get_shape().ndims == 1
                     loss += cp_loss
 
@@ -115,12 +119,11 @@ class Ectc_Docd(CTCModel):
         batch major
         """
         with tf.name_scope('CE_loss'):
-            # crossent = smoothing_cross_entropy(
-            #     logits=logits,
-            #     labels=labels,
-            #     vocab_size=self.args.dim_output,
-            #     confidence=self.args.model.decoder.label_smoothing)
-            crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits)
+            crossent = smoothing_cross_entropy(
+                logits=logits,
+                labels=labels,
+                vocab_size=self.args.dim_output,
+                confidence=self.args.model.decoder.label_smoothing)
             mask = tf.sequence_mask(
                 len_labels,
                 maxlen=tf.shape(logits)[1],

@@ -58,7 +58,7 @@ class CTCModel(Seq2SeqModel):
                     len_labels=len_labels)
 
                 if self.args.model.confidence_penalty:
-                    cp_loss = self.args.model.decoder.confidence_penalty * confidence_penalty(logits, len_logits)
+                    cp_loss = self.args.model.confidence_penalty * confidence_penalty(logits, len_logits)
                     assert cp_loss.get_shape().ndims == 1
                     loss += cp_loss
 
@@ -88,8 +88,8 @@ class CTCModel(Seq2SeqModel):
             labels_sparse,
             logits,
             sequence_length=len_logits,
-            # ctc_merge_repeated=False,
-            ctc_merge_repeated=True,
+            ctc_merge_repeated=False,
+            # ctc_merge_repeated=True,
             ignore_longer_outputs_than_inputs=True,
             time_major=False)
 

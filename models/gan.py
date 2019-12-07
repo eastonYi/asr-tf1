@@ -71,7 +71,8 @@ class GAN:
 
         unfeature = tensors_input.unfeature_splits[id_gpu]
         len_unfeatures = tensors_input.len_unfeat_splits[id_gpu]
-        len_unlabel = tensors_input.len_unlabel_splits[id_gpu]
+        unlabels = tensors_input.unlabel_splits[id_gpu]
+        len_unlabels = tensors_input.len_unlabel_splits[id_gpu]
         text = tensors_input.text_splits[id_gpu]
         len_text = tensors_input.len_text_splits[id_gpu]
 
@@ -84,22 +85,35 @@ class GAN:
                 len_logits=len_logits_ctc,
                 labels=labels,
                 len_labels=len_labels)
+            if self.args.model.confidence_penalty:
+                ctc_loss += self.args.model.confidence_penalty * confidence_penalty(logits_ctc, len_logits_ctc)
+            # logits_ocd = tf.Print(logits_ocd, [len_labels, len_logits_ocd], 'len_labels, len_logits_ocd: ', summarize=20)
+
             len_labels = tf.where(len_labels<len_logits_ocd, len_labels, len_logits_ocd)
-            # len_labels = tf.where(len_labels>tf.ones_like(len_labels), len_labels, tf.ones_like(len_labels))
+            len_labels = tf.where(len_labels>tf.ones_like(len_labels), len_labels, tf.ones_like(len_labels))
             min_len = tf.reduce_min([tf.shape(logits_ocd)[1], tf.shape(labels)[1]])
 
             ce_loss = self.G.ce_loss(
                 logits=logits_ocd[:, :min_len, :],
                 labels=labels[:, :min_len],
                 len_labels=len_labels)
+
+            loss_G_supervise = ctc_loss
             # loss_G_supervise = ctc_loss + ce_loss
-            loss_G_supervise = ce_loss
             loss_G_supervise = tf.reduce_mean(loss_G_supervise)
 
             (_, logits_G_un), _, (_, len_decoded) = self.G(unfeature, len_unfeatures, reuse=True)
             # sample_mask = tf.cast(tf.equal(len_unlabel, len_decoded), tf.float32)
             # sample_mask = tf.zeros_like(len_label, dtype=tf.float32)
             # sample_mask = tf.ones_like(len_unlabel, dtype=tf.float32)
+
+            # len_unlabels = tf.where(len_unlabels<len_decoded, len_unlabels, len_decoded)
+            # min_len = tf.reduce_min([tf.shape(logits_G_un)[1], tf.shape(unlabels)[1]])
+            # ce_loss = self.G.ce_loss(
+            #     logits=logits_G_un[:, :min_len, :],
+            #     labels=unlabels[:, :min_len],
+            #     len_labels=len_unlabels)
+            # loss_G_supervise += tf.reduce_mean(ce_loss)
 
             # D loss fake
             logits_G_un = batch3D_pad_to(logits_G_un, length=self.args.max_label_len)
@@ -120,7 +134,8 @@ class GAN:
 
             # loss_D_res = tf.constant(0.0)
             loss_D = loss_D_res + loss_D_text +  gp
-            loss_G = self.args.rate * loss_G_supervise - loss_D_res
+            # loss_G = self.args.rate * loss_G_supervise - loss_D_res
+            loss_G = loss_G_supervise
 
             with tf.name_scope("gradients"):
                 gradients_D = self.optimizer_D.compute_gradients(
@@ -133,55 +148,6 @@ class GAN:
             self.__class__.__name__, name_gpu, self.__class__.num_Model))
 
         return loss_D, loss_G, gradients_D, gradients_G, [ctc_loss, ce_loss, loss_D_res, loss_D_text, gp]
-
-    # def build_single_graph(self, id_gpu, name_gpu, tensors_input):
-    #
-    #     text = tensors_input.text_splits[id_gpu]
-    #     len_text = tensors_input.len_text_splits[id_gpu]
-    #
-    #     with tf.device(name_gpu):
-    #         # G loss
-    #         batch_size = tf.shape(text)[0]
-    #         logits_G_un, len_decoded = self.G(reuse=True)
-    #
-    #         # D loss fake
-    #         logits_D_res = self.D(tf.nn.softmax(logits_G_un, -1), len_decoded, reuse=True)
-    #         loss_D_res = tf.reduce_mean(logits_D_res)
-    #
-    #         # D loss real
-    #         feature_text = tf.one_hot(text, self.args.dim_output)
-    #         logits_D_text = self.D(feature_text, len_text, reuse=True)
-    #         loss_D_text = -tf.reduce_mean(logits_D_text)
-    #
-    #         # D loss greadient penalty
-    #         # idx = tf.random.uniform(
-    #         #     (), maxval=(self.args.text_batch_size-self.args.batch_size), dtype=tf.int32)
-    #         gp = 0.05 * self.D.gradient_penalty(
-    #             # real=feature_text[idx:idx+4],
-    #             real=feature_text[0:tf.shape(logits_G_un)[0]],
-    #             fake=tf.nn.softmax(logits_G_un, -1),
-    #             len_inputs=len_decoded)
-    #         loss_G_supervise = tf.constant(0.0)
-    #
-    #         # loss_D_res = tf.constant(0.0)
-    #         loss_D = loss_D_res + loss_D_text +  gp
-    #         loss_G = -loss_D_res
-    #         # loss_D = loss_D_res + loss_D_text
-    #         # loss_G = loss_G_res
-    #         # loss_G = 0
-    #
-    #         with tf.name_scope("gradients"):
-    #             gradients_D = self.optimizer_D.compute_gradients(
-    #                 loss_D, var_list=self.D.trainable_variables)
-    #             gradients_G = self.optimizer_G.compute_gradients(
-    #                 loss_G, var_list=self.G.trainable_variables)
-    #
-    #     self.__class__.num_Model += 1
-    #     logging.info('\tbuild {} on {} succesfully! total model number: {}'.format(
-    #         self.__class__.__name__, name_gpu, self.__class__.num_Model))
-    #
-    #     return loss_D, loss_G, gradients_D, gradients_G, [loss_G_supervise, loss_D_res, loss_D_text, gp]
-
 
     def build_input(self):
         """
@@ -382,7 +348,13 @@ class Conditional_GAN(GAN):
 
     def build_optimizer(self):
         # if self.args.lr_type == 'constant_learning_rate':
-        self.learning_rate_G = tf.convert_to_tensor(self.args.lr_G)
+        # self.learning_rate_G = tf.convert_to_tensor(self.args.lr_G)
+        self.learning_rate_G = warmup_exponential_decay(
+            self.global_step,
+            warmup_steps=self.args.warmup_steps,
+            peak=self.args.peak,
+            decay_rate=0.5,
+            decay_steps=self.args.decay_steps)
         self.learning_rate_D = tf.convert_to_tensor(self.args.lr_D)
         # self.optimizer_G = tf.train.GradientDescentOptimizer(self.learning_rate_G)
         # self.optimizer_D = tf.train.GradientDescentOptimizer(self.learning_rate_D)

@@ -61,9 +61,9 @@ def train():
         training=False,
         args=args)
     vars_G = G.trainable_variables()
-    vars_G_en = G.trainable_variables('Ectc_Docd/encoder')
-    vars_G_ctc = G.trainable_variables('Ectc_Docd/ctc_decoder')
-    vars_G_ocd = G.trainable_variables('Ectc_Docd/ocd_decoder')
+    # vars_G_en = G.trainable_variables('Ectc_Docd/encoder')
+    # vars_G_ctc = G.trainable_variables('Ectc_Docd/ctc_decoder')
+    # vars_G_ocd = G.trainable_variables('Ectc_Docd/ocd_decoder')
 
     D = args.Model_D(
         tensor_global_step1,
@@ -78,7 +78,7 @@ def train():
 
     start_time = datetime.now()
     saver_G = tf.train.Saver(vars_G, max_to_keep=1)
-    saver_G_en = tf.train.Saver(vars_G_en + vars_G_ctc, max_to_keep=5)
+    # saver_G_en = tf.train.Saver(vars_G_en + vars_G_ctc, max_to_keep=5)
     saver = tf.train.Saver(max_to_keep=15)
     summary = Summary(str(args.dir_log))
 
@@ -90,8 +90,8 @@ def train():
         dataloader_dev.sess = sess
         if args.dirs.checkpoint_G:
             saver_G.restore(sess, args.dirs.checkpoint_G)
-        if args.dirs.checkpoint_G_en:
-            saver_G_en.restore(sess, args.dirs.checkpoint_G_en)
+        # if args.dirs.checkpoint_G_en:
+        #     saver_G_en.restore(sess, args.dirs.checkpoint_G_en)
 
         # for i in range(500):
         #     ctc_loss, *_ = sess.run(G.list_run)
@@ -106,41 +106,48 @@ def train():
         progress = 0
         while progress < args.num_epochs:
 
-            global_step, lr_G, lr_D = sess.run([tensor_global_step0, gan.learning_rate_G, gan.learning_rate_D])
+            global_step, lr_G, lr_D = sess.run([tensor_global_step, G.learning_rate, gan.learning_rate_D])
+            # global_step, lr_G, lr_D = sess.run([tensor_global_step0, gan.learning_rate_G, gan.learning_rate_D])
 
             # supervised training
-            # loss, shape_batch, _, _ = sess.run(G.list_run)
+            loss_G, shape_batch, _, (ctc_loss, ce_loss, *_) = sess.run(G.list_run)
 
             # untrain
-            text = sess.run(iter_text)
-            text_lens = get_batch_length(text)
-            shape_text = text.shape
-            # loss_D, loss_D_res, loss_D_text, loss_gp, _ = sess.run(gan.list_train_D,
-            #                                               feed_dict={gan.list_pl[0]:text,
-            #                                                          gan.list_pl[1]:text_lens})
+            # for _ in range(1):
+            #     text = sess.run(iter_text)
+            #     text_lens = get_batch_length(text)
+            #     shape_text = text.shape
+            #     loss_D, loss_D_res, loss_D_text, loss_gp, _ = sess.run(gan.list_train_D,
+            #                                                   feed_dict={gan.list_pl[0]:text,
+            #                                                              gan.list_pl[1]:text_lens})
             loss_D = loss_D_res = loss_D_text = loss_gp = 0
-            (loss_G, ctc_loss, ce_loss, _), (shape_feature, shape_unfeature) = \
-                sess.run([gan.list_train_G, gan.list_feature_shape])
+            # (loss_G, ctc_loss, ce_loss, _), (shape_feature, shape_unfeature) = \
+            #     sess.run([gan.list_train_G, gan.list_feature_shape])
 
-            num_processed += shape_feature[0]
-            num_processed_unbatch += shape_unfeature[0]
+            # num_processed += shape_feature[0]
+            # num_processed_unbatch += shape_unfeature[0]
             used_time = time()-batch_time
             batch_time = time()
             progress = num_processed/args.data.train_size
             progress_unbatch = num_processed_unbatch/args.data.untrain_size
 
             if global_step % 20 == 0:
-                # print('ctc loss: {:.2f}'.format(np.mean(loss)))
-                print('ctc_loss, ce_loss: {:.2f}|{:.2f}, loss res|real|gp: {:.2f}|{:.2f}|{:.2f}\tbatch: {}|{}|{}\tlr:{:.1e}|{:.1e} {:.2f}s {:.1f}%|{:.1f}% step: {}'.format(
-                       np.mean(ctc_loss), np.mean(ce_loss), loss_D_res, loss_D_text, loss_gp, shape_feature, shape_unfeature, shape_text, lr_G, lr_D, used_time, progress*100.0, progress_unbatch*100.0, global_step))
+                # pass
+                # import pdb; pdb.set_trace()
+                # print('ctc loss: {:.2f}'.format(np.mean(ctc_loss)))
+                # print('ce loss: {:.2f}'.format(np.mean(ce_loss)))
+                print('ctc_loss, ce_loss: {:.2f}|{:.2f}, loss res|real|gp: {:.2f}|{:.2f}|{:.2f}\tlr:{:.1e}|{:.1e} {:.2f}s step: {}'.format(
+                       np.mean(ctc_loss), np.mean(ce_loss), loss_D_res, loss_D_text, loss_gp, lr_G, lr_D, used_time, global_step))
                 # summary.summary_scalar('loss_G', loss_G, global_step)
                 # summary.summary_scalar('loss_D', loss_D, global_step)
                 # summary.summary_scalar('lr_G', lr_G, global_step)
                 # summary.summary_scalar('lr_D', lr_D, global_step)
 
             if global_step % args.save_step == args.save_step - 1:
-                saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step, write_meta_graph=True)
-                print('saved model in',  str(args.dir_checkpoint)+'/model-'+str(global_step))
+                # saver.save(get_session(sess), str(args.dir_checkpoint/'model_ce'), global_step=global_step, write_meta_graph=True)
+                # print('saved model in',  str(args.dir_checkpoint)+'/model_ce-'+str(global_step))
+                saver_G.save(get_session(sess), str(args.dir_checkpoint/'model_G'), global_step=global_step, write_meta_graph=True)
+                print('saved G in',  str(args.dir_checkpoint)+'/model_G-'+str(global_step))
                 # saver_G_en.save(get_session(sess), str(args.dir_checkpoint/'model_G_en'), global_step=global_step, write_meta_graph=True)
                 # print('saved model in',  str(args.dir_checkpoint)+'/model_G_en-'+str(global_step))
 
@@ -156,8 +163,8 @@ def train():
                     eos_idx=args.eos_idx,
                     min_idx=0,
                     max_idx=args.dim_output-1)
-                # summary.summary_scalar('dev_cer', cer, global_step)
-                # summary.summary_scalar('dev_wer', wer, global_step)
+                summary.summary_scalar('dev_cer', cer, global_step)
+                summary.summary_scalar('dev_wer', wer, global_step)
 
             if global_step % args.decode_step == args.decode_step - 1:
                 decode_test(

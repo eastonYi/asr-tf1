@@ -185,6 +185,8 @@ elif args.model.type == 'ctcModel_EODM':
     from models.ctcModel_EODM import CTCModel as Model
 elif args.model.type == 'Ectc_Docd':
     from models.Ectc_Docd import Ectc_Docd as Model
+elif args.model.type == 'ctc_ce':
+    from models.CTC_CE import CTC_CE as Model
 elif args.model.type == 'classifier':
     from models.classifier import Classifier as Model
 elif args.model.type == 'transformer':

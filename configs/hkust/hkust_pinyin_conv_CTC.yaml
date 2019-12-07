@@ -25,14 +25,15 @@ data:
 
 model:
     type: ctcModel
+    # confidence_penalty: 0.2
     encoder:
-        type: conv_lstm
-        hidden_size: 1024
-        num_filters: 64
+        type: conv2
+        num_filters: 128
         dropout: 0.9
     decoder:
         type: FC
-        num_fc: 0
+        num_fc: 2
+        hidden_size: 256
 opti:
     type: adam
     lr: 0.0004

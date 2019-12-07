@@ -95,6 +95,29 @@ def down_sample(features, rate, axis=1):
     return tf.gather(features, tf.range(len_seq, delta=rate), axis=axis)
 
 
+def batch_splice(features, left_num, right_num):
+    """
+    [[[1,1,1], [2,2,2], [3,3,3], [4,4,4], [5,5,5], [6,6,6], [7,7,7]],
+     [[1,1,1], [2,2,2], [3,3,3], [4,4,4], [5,5,5], [6,6,6], [7,7,7]]])
+    left_num=1, right_num=1:
+    array([[[0, 0, 0, 1, 1, 1, 2, 2, 2],
+            [3, 3, 3, 4, 4, 4, 5, 5, 5],
+            [6, 6, 6, 7, 7, 7, 0, 0, 0]],
+
+           [[0, 0, 0, 1, 1, 1, 2, 2, 2],
+            [3, 3, 3, 4, 4, 4, 5, 5, 5],
+            [6, 6, 6, 7, 7, 7, 0, 0, 0]]])>)
+    """
+    shape = tf.shape(features)
+    splices = []
+    pp = tf.pad(features, [[0, 0], [left_num, right_num], [0, 0]])
+    for i in range(left_num + right_num + 1):
+        splices.append(tf.slice(pp, [0, i, 0], shape))
+    splices = tf.concat(axis=-1, values=splices)
+
+    return splices[:, ::(left_num + right_num + 1), :]
+
+
 def target_delay(features, num_target_delay):
     seq_len = tf.shape(features)[0]
     feats_part1 = tf.slice(features, [num_target_delay, 0], [seq_len-num_target_delay, -1])

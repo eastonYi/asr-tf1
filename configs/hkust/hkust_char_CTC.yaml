@@ -24,14 +24,16 @@ data:
     unit: word
 
 model:
-    structure: ctcModel
+    type: ctcModel
+    confidence_penalty: 0.2
     encoder:
-        structure: conv_lstm
-        num_hidden: 1600
+        type: conv_lstm
+        hidden_size: 1024
         num_filters: 64
         dropout: 0.9
     decoder:
-        structure: FC
+        type: FC
+        num_fc: 0
 opti:
     type: adam
     lr: 0.0004
@@ -46,8 +48,9 @@ warmup_steps: 6000
 peak: 0.0002
 decay_steps: 8000
 
-gpus: '0,1,2,3'
+gpus: '4,5,6,7'
 batch_size: 60
+text_batch_size: 200
 beam_size: 1
 num_supervised:
 num_batch_tokens: 40000

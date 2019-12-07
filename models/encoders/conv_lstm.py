@@ -20,10 +20,10 @@ class CONV_LSTM(Encoder):
         # x = tf.expand_dims(features, -1)
         size_batch  = tf.shape(features)[0]
         size_length = tf.shape(features)[1]
-        # size_feat = int(size_feat/3)
+        size_feat = int(size_feat/3)
         len_feats = tf.reduce_sum(tf.cast(tf.reduce_sum(tf.abs(features), -1) > 0, tf.int32), -1)
-        # x = tf.reshape(features, [size_batch, size_length, size_feat, 3])
-        x = tf.reshape(features, [size_batch, size_length, size_feat, 1])
+        x = tf.reshape(features, [size_batch, size_length, size_feat, 3])
+        # x = tf.reshape(features, [size_batch, size_length, size_feat, 1])
         # the first cnn layer
         x = self.normal_conv(
             inputs=x,
@@ -33,7 +33,6 @@ class CONV_LSTM(Encoder):
             padding='SAME',
             use_relu=True,
             name="conv",
-            w_initializer=None,
             norm_type='layer')
         x = conv_lstm(
             x=x,
@@ -90,11 +89,9 @@ class CONV_LSTM(Encoder):
         return outputs, len_seq
 
     @staticmethod
-    def normal_conv(inputs, filter_num, kernel, stride, padding, use_relu, name,
-                    w_initializer=None, norm_type="batch"):
+    def normal_conv(inputs, filter_num, kernel, stride, padding, use_relu, name, norm_type="batch"):
         with tf.variable_scope(name):
-            net = tf.layers.conv2d(inputs, filter_num, kernel, stride, padding,
-                               kernel_initializer=w_initializer, name="conv")
+            net = tf.layers.conv2d(inputs, filter_num, kernel, stride, padding, name="conv")
             if norm_type == "batch":
                 net = tf.layers.batch_normalization(net, name="bn")
             elif norm_type == "layer":

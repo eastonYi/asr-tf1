@@ -1,12 +1,12 @@
 dirs:
     exp: aishell
     train:
-        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-5k.scp
-        trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-5k.phone67
-        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-5k_xy
-        # scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
-        # trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k.phone67
-        # tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-120k_xy
+        # scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-5k.scp
+        # trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-5k.phone67
+        # tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-5k_xy
+        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
+        trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k.phone67
+        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-120k_xy
     untrain:
         scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
         trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k.phone67
@@ -23,9 +23,8 @@ dirs:
         data: /mnt/lustre/xushuang2/easton/data/aishell/phone/text-120k.phone67
     type: scp
     vocab: /mnt/lustre/xushuang2/easton/data/aishell/phone/phones_67+1.vocab
-    # checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_Ectc_Docd/5k_conv_ctc+ce/checkpoint/CTC0.35_CE0.32/model_ce-2599
-    # checkpoint_G_en: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_Ectc_Docd/checkpoint/model_G_en-40999
-    # checkpoint_G_en: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_Ectc_Docd/5k_conv/checkpoint/model_G_en-6399
+    # checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_CTC_CE/120k/checkpoint/model_G-13999
+
 data:
     featType: mfcc
     left_context: 0
@@ -35,18 +34,22 @@ data:
     unit: word
 
 model:
-    type: Ectc_Docd
+    type: ctc_ce
     dropout: 0.05
     # confidence_penalty: 0.2
     encoder:
         type: conv2
-        # type: conv_lstm
-        num_filters: 128
+        num_filters: 256
         num_blocks: 2
+        # type: conv_lstm
+        # hidden_size: 256
+        # num_filters: 64
+        # num_blocks: 3
+
     decoder:
-        type: conv_decoder
-        # type: FC
-        num_filters: 128
+        # type: conv_decoder
+        type: FC
+        num_filters: 256
         num_blocks: 1
         hidden_size: 256
         num_fc: 3
@@ -76,19 +79,19 @@ decode_step: 200
 save_step: 200
 num_epochs: 999
 
-gpus: '0,1,2,3'
-# gpus: '1,2,3'
+gpus: '0,1'
+# gpus: '0,1,2,3'
 # gpus: '4,5,6,7'
-# gpus: '4,5'
-batch_size: 200
+# gpus: '0,4,6,7'
+batch_size: 400
 beam_size: 1
 text_batch_size: 200
 max_feat_len: 1230
 max_label_len: 60
-num_batch_tokens: 60000
+num_batch_tokens: 80000
 bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
 
-lambda_lm: 0.0
+lambda_lm: 0.00001
 lambda_l2: 0.0
 grad_clip_value: 0.0
 grad_clip_norm: 0.0
