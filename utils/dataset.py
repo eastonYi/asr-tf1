@@ -39,7 +39,7 @@ class ASRDataSet(DataSet):
         self.args = args
         self.transform = transform
         self._shuffle = _shuffle
-        self.token2idx,self.idx2token = args.token2idx,args.idx2token
+        self.token2idx,self.idx2token = args.token2idx, args.idx2token
         self.end_id = self.gen_end_id(self.token2idx)
 
     def gen_end_id(self, token2idx):
@@ -144,6 +144,51 @@ class ASR_scp_DataSet(ASRDataSet):
                 dict_trans[uttid] = trans
 
         return dict_trans
+
+
+class ASR_phone_char_ArkDataSet(ASR_scp_DataSet):
+    """
+    for dataset with phone and char dataset
+    needs:
+        - phone_file
+        - char_file
+        - uttid2wav.txt
+            uttid wav
+        - vocab.txt (used for model output)
+            phone
+        -
+    """
+    def __init__(self, f_scp, phone_trans, char_trans, feat_len_file, args, _shuffle, transform):
+        super().__init__(f_scp, char_trans, args, _shuffle, transform)
+        self.phone_char_rate = 2.0
+        self.dict_phone_trans = self.load_trans(phone_trans)
+        self.dict_char_trans = self.load_trans(char_trans)
+        self.list_uttids = set(self.dict_phone_trans.keys()) & set(self.dict_char_trans.keys())
+
+        if _shuffle:
+            shuffle(self.list_uttids)
+
+    def __getitem__(self, id):
+        uttid = self.list_uttids[id]
+
+        feat = self.reader.read_utt_data(id)
+        if self.transform:
+            feat = process_raw_feature(feat, self.args)
+        char_trans = self.dict_char_trans[uttid]
+        phone_trans = self.dict_phone_trans[uttid]
+        char_trans = self.fix_char(phone_trans, char_trans)
+        sample = {'uttid': uttid,
+                  'feature': feat,
+                  'char': char_trans,
+                  'phone': phone_trans}
+
+        return sample
+
+    def fix_char(self, phone_trans, char_trans):
+        if len(phone_trans) / len(char_trans) != self.phone_char_rate:
+            print(phone_trans)
+            print(char_trans)
+        return char_trans
 
 
 class ASR_align_DataSet(ASRDataSet):

@@ -44,6 +44,8 @@ if not args.dir_checkpoint.is_dir(): args.dir_checkpoint.mkdir()
 
 # vocab
 args.token2idx, args.idx2token = load_vocab(args.dirs.vocab)
+if args.dirs.phone_vocab:
+    args.phone2idx, args.idx2phone = load_vocab(args.dirs.phone_vocab)
 args.dim_output = len(args.token2idx)
 if '<eos>' in args.token2idx.keys():
     args.eos_idx = args.token2idx['<eos>']
@@ -82,6 +84,26 @@ if args.dirs.type == 'scp':
         _shuffle=False,
         transform=False)
     dataset_test = ASR_scp_DataSet(
+        f_scp=args.dirs.test.scp,
+        f_trans=args.dirs.test.trans,
+        args=args,
+        _shuffle=False,
+        transform=True)
+if args.dirs.type == 'scp_multi':
+    from .dataset import ASR_phone_char_ArkDataSet
+    dataset_train = ASR_phone_char_ArkDataSet(
+        f_scp=args.dirs.train.scp,
+        f_trans=args.dirs.train.trans,
+        args=args,
+        _shuffle=True,
+        transform=False)
+    dataset_dev = ASR_phone_char_ArkDataSet(
+        f_scp=args.dirs.dev.scp,
+        f_trans=args.dirs.dev.trans,
+        args=args,
+        _shuffle=False,
+        transform=False)
+    dataset_test = ASR_phone_char_ArkDataSet(
         f_scp=args.dirs.test.scp,
         f_trans=args.dirs.test.trans,
         args=args,

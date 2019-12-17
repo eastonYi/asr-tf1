@@ -161,6 +161,50 @@ def readTFRecord(dir_data, args, _shuffle=False, transform=False):
     #
     # return feature, label
 
+
+def save2tfrecord_multilabel(dataset, dir_save, size_file=5000000):
+
+    def _bytes_feature(value):
+        return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+    num_token = 0
+    idx_file = -1
+    num_damaged_sample = 0
+
+    assert dataset.transform == False
+    with open(dir_save/'feature_length.txt', 'w') as fw:
+        for i, sample in enumerate(tqdm(dataset)):
+            if not sample:
+                num_damaged_sample += 1
+                continue
+            dim_feature = sample['feature'].shape[-1]
+            if (num_token // size_file) > idx_file:
+                idx_file = num_token // size_file
+                print('saving to file {}/{}.recode'.format(dir_save, idx_file))
+                writer = tf.io.TFRecordWriter(str(dir_save/'{}.recode'.format(idx_file)))
+
+            example = tf.train.Example(
+                features=tf.train.Features(
+                    feature={'feature': _bytes_feature(sample['feature'].tostring()),
+                             'phone': _bytes_feature(sample['phone'].tostring()),
+                             'char': _bytes_feature(sample['char'].tostring())}
+                )
+            )
+            writer.write(example.SerializeToString())
+            num_token += len(sample['feature'])
+            line = sample['uttid'] + ' ' + str(len(sample['feature']))
+            fw.write(line + '\n')
+
+    with open(dir_save/'tfdata.info', 'w') as fw:
+        # print('data_file {}'.format(dataset.list_files), file=fw)
+        print('dim_feature {}'.format(dim_feature), file=fw)
+        print('num_tokens {}'.format(num_token), file=fw)
+        print('size_dataset {}'.format(i-num_damaged_sample), file=fw)
+        print('damaged samples: {}'.format(num_damaged_sample), file=fw)
+
+    return
+
+
 def readTFRecord_multilabel(dir_data, args, _shuffle=False, transform=False):
     """
     use for multi-label
@@ -179,21 +223,20 @@ def readTFRecord_multilabel(dir_data, args, _shuffle=False, transform=False):
     features = tf.parse_single_example(
         serialized_example,
         features={'feature': tf.FixedLenFeature([], tf.string),
-                  # 'id': tf.FixedLenFeature([], tf.string)}
-                  'label': tf.FixedLenFeature([], tf.string),
-                  'phone': tf.FixedLenFeature([], tf.string)}
+                  'phone': tf.FixedLenFeature([], tf.string),
+                  'char': tf.FixedLenFeature([], tf.string)
+                  }
     )
 
     feature = tf.reshape(tf.decode_raw(features['feature'], tf.float32),
         [-1, args.data.dim_feature])[:2000, :]
-    # id = tf.decode_raw(features['id'], tf.string)
-    label = tf.decode_raw(features['label'], tf.int32)
     phone = tf.decode_raw(features['phone'], tf.int32)
+    label = tf.decode_raw(features['char'], tf.int32)
 
     if transform:
         feature = process_raw_feature(feature, args)
 
-    return feature, label, phone
+    return feature, phone, label
 
 
 def process_raw_feature(seq_raw_features, args):
@@ -231,8 +274,8 @@ class TFReader:
         self.sess = None
         self.list_batch_size = self.args.list_batch_size
         self.list_bucket_boundaries = self.args.list_bucket_boundaries
-        if args.phone:
-            self.feat, self.label, self.phone = readTFRecord_multilabel(
+        if args.vocab_phone:
+            self.feat, self.phone, self.label = readTFRecord_multilabel(
                 dir_tfdata,
                 args,
                 _shuffle=training,
@@ -302,8 +345,8 @@ class TFReader:
         list_inputs: [tensor1, tensor2]
         added_list_inputs: [tensor1, tensor2, len_tensor1, len_tensor2]
         """
-        list_inputs = [self.feat, self.label, self.phone,
-                       tf.shape(self.feat)[0], tf.shape(self.label)[0], tf.shape(self.phone)[0]]
+        list_inputs = [self.feat, self.phone, self.label,
+                       tf.shape(self.feat)[0], tf.shape(self.phone)[0], tf.shape(self.label)[0]]
         _, list_outputs = tf.contrib.training.bucket_by_sequence_length(
             input_length=tf.shape(self.feat)[0],
             tensors=list_inputs,
@@ -315,11 +358,11 @@ class TFReader:
             dynamic_pad=True,
             allow_smaller_final_batch=True)
         seq_len_feats = tf.reshape(list_outputs[3], [-1])
-        seq_len_label = tf.reshape(list_outputs[4], [-1])
-        seq_len_phone = tf.reshape(list_outputs[5], [-1])
+        seq_len_phone = tf.reshape(list_outputs[4], [-1])
+        seq_len_label = tf.reshape(list_outputs[5], [-1])
 
         return list_outputs[0], list_outputs[1], list_outputs[2],\
-                seq_len_feats, seq_len_label, seq_len_phone
+                seq_len_feats, seq_len_phone, seq_len_label
 
 
 class TFData:

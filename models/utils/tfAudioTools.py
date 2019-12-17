@@ -95,7 +95,7 @@ def down_sample(features, rate, axis=1):
     return tf.gather(features, tf.range(len_seq, delta=rate), axis=axis)
 
 
-def batch_splice(features, left_num, right_num):
+def batch_splice(features, left_num, right_num, jump=True):
     """
     [[[1,1,1], [2,2,2], [3,3,3], [4,4,4], [5,5,5], [6,6,6], [7,7,7]],
      [[1,1,1], [2,2,2], [3,3,3], [4,4,4], [5,5,5], [6,6,6], [7,7,7]]])
@@ -115,7 +115,7 @@ def batch_splice(features, left_num, right_num):
         splices.append(tf.slice(pp, [0, i, 0], shape))
     splices = tf.concat(axis=-1, values=splices)
 
-    return splices[:, ::(left_num + right_num + 1), :]
+    return splices[:, ::(left_num + right_num + 1), :] if jump else splices
 
 
 def target_delay(features, num_target_delay):

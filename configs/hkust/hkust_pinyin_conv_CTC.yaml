@@ -1,9 +1,13 @@
 dirs:
     exp: hkust
     train:
-        scp: /mnt/lustre/xushuang2/easton/data/hkust/feats_3x.scp
-        trans: /mnt/lustre/xushuang2/easton/data/hkust/pinyin.train_3x.scp
-        tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/train_pinyin_xy
+    #     scp: /mnt/lustre/xushuang2/easton/data/hkust/feats.train_3x.scp
+    #     trans: /mnt/lustre/xushuang2/easton/data/hkust/pinyin.train_3x.scp
+    #     tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/train_pinyin_xy
+    # train_supervised:
+        scp: /mnt/lustre/xushuang2/easton/data/hkust/feats.train_1k_3x.scp
+        trans: /mnt/lustre/xushuang2/easton/data/hkust/pinyin.train_1k_3x.scp
+        tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/train_pinyin_1k_xy
     dev:
         scp: /mnt/lustre/xushuang2/easton/data/hkust/feats.dev.scp
         trans: /mnt/lustre/xushuang2/easton/data/hkust/pinyin.dev.scp
@@ -25,10 +29,11 @@ data:
 
 model:
     type: ctcModel
-    # confidence_penalty: 0.2
+    confidence_penalty: 0.2
     encoder:
         type: conv2
-        num_filters: 128
+        num_blocks: 3
+        num_filters: 512
         dropout: 0.9
     decoder:
         type: FC
@@ -44,17 +49,21 @@ save_step: 200
 num_epochs: 999
 
 optimizer: adam
-warmup_steps: 6000
+# warmup_steps: 6000
+# peak: 0.0002
+# decay_steps: 8000
+warmup_steps: 1000
 peak: 0.0002
-decay_steps: 8000
+decay_steps: 2000
 
-gpus: '0,2,3'
+# gpus: '2,3'
+gpus: '4,5,6,7'
 batch_size: 60
 beam_size: 1
 text_batch_size: 200
 num_supervised:
-num_batch_tokens: 40000
-bucket_boundaries: 172,231,278,321,364,407,457,518,604,766,2083
+num_batch_tokens: 100000
+bucket_boundaries: 192,262,322,380,444,526,662,1230,4264
 seed: 8
 
 lambda_l2: 0.0

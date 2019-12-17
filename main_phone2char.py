@@ -11,9 +11,9 @@ import numpy as np
 import editdistance as ed
 
 from models.utils.tools import get_session, create_embedding, size_variables
-from models.utils.tfData import TFReader, readTFRecord, TFData
+from models.utils.tfData import TFReader, readTFRecord_multilabel, TFData
 from utils.arguments import args
-from utils.dataset import ASRDataLoader, TextDataSet
+from utils.dataset import ASR_phone_char_ArkDataSet, TextDataSet
 from utils.summaryTools import Summary
 # from utils.performanceTools import dev, decode_test
 from utils.textTools import array_idx2char, array2text, batch_wer, batch_cer
@@ -24,11 +24,11 @@ def train():
     print('reading data form ', args.dirs.train.tfdata)
     dataReader_train = TFReader(args.dirs.train.tfdata, args=args)
     batch_train = dataReader_train.fentch_batch_bucket()
-    dataReader_untrain = TFReader(args.dirs.untrain.tfdata, args=args)
-    batch_untrain = dataReader_untrain.fentch_batch(args.batch_size)
+    # dataReader_untrain = TFReader(args.dirs.untrain.tfdata, args=args)
+    # batch_untrain = dataReader_untrain.fentch_batch(args.batch_size)
     # batch_untrain = dataReader_untrain.fentch_batch_bucket()
-    args.dirs.untrain.tfdata = Path(args.dirs.untrain.tfdata)
-    args.data.untrain_size = TFData.read_tfdata_info(args.dirs.untrain.tfdata)['size_dataset']
+    # args.dirs.untrain.tfdata = Path(args.dirs.untrain.tfdata)
+    # args.data.untrain_size = TFData.read_tfdata_info(args.dirs.untrain.tfdata)['size_dataset']
 
     dataset_text = TextDataSet(list_files=[args.dirs.text.data], args=args, _shuffle=True)
     tfdata_train = tf.data.Dataset.from_generator(
@@ -37,10 +37,10 @@ def train():
         padded_batch(args.text_batch_size, ([args.max_label_len])).prefetch(buffer_size=5).\
         make_one_shot_iterator().get_next()
 
-    feat, label = readTFRecord(args.dirs.dev.tfdata, args,
-                               _shuffle=False, transform=True)
-    dataloader_dev = ASRDataLoader(args.dataset_dev, args, feat, label,
-                                   batch_size=args.batch_size, num_loops=1)
+    feat, label = readTFRecord_multilabel(
+        args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
+    dataloader_dev = ASR_phone_char_ArkDataSet(
+        args.dataset_dev, args, feat, label, batch_size=args.batch_size, num_loops=1)
 
     tensor_global_step = tf.train.get_or_create_global_step()
     tensor_global_step0 = tf.Variable(0, dtype=tf.int32, trainable=False)
@@ -71,8 +71,8 @@ def train():
         name='discriminator',
         args=args)
 
-    gan = args.GAN([tensor_global_step0, tensor_global_step1], G, D,
-                   batch=batch_train, unbatch=batch_untrain, name='GAN', args=args)
+    # gan = args.GAN([tensor_global_step0, tensor_global_step1], G, D,
+    #                batch=batch_train, unbatch=batch_untrain, name='GAN', args=args)
 
     size_variables()
 

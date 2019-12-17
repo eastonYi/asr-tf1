@@ -98,7 +98,7 @@ class GAN:
                 labels=labels[:, :min_len],
                 len_labels=len_labels)
 
-            loss_G_supervise = ctc_loss
+            loss_G_supervise = ce_loss
             # loss_G_supervise = ctc_loss + ce_loss
             loss_G_supervise = tf.reduce_mean(loss_G_supervise)
 
@@ -107,6 +107,7 @@ class GAN:
             # sample_mask = tf.zeros_like(len_label, dtype=tf.float32)
             # sample_mask = tf.ones_like(len_unlabel, dtype=tf.float32)
 
+            # supervise
             # len_unlabels = tf.where(len_unlabels<len_decoded, len_unlabels, len_decoded)
             # min_len = tf.reduce_min([tf.shape(logits_G_un)[1], tf.shape(unlabels)[1]])
             # ce_loss = self.G.ce_loss(
@@ -132,16 +133,16 @@ class GAN:
                 len_inputs=len_decoded)
             # gp = tf.constant(0.0)
 
-            # loss_D_res = tf.constant(0.0)
+            # loss_D = tf.constant(0.0)
             loss_D = loss_D_res + loss_D_text +  gp
-            # loss_G = self.args.rate * loss_G_supervise - loss_D_res
-            loss_G = loss_G_supervise
+            loss_G = self.args.rate * loss_G_supervise - loss_D_res
+            # loss_G = -loss_D_res
 
             with tf.name_scope("gradients"):
                 gradients_D = self.optimizer_D.compute_gradients(
                     loss_D, var_list=self.D.trainable_variables())
                 gradients_G = self.optimizer_G.compute_gradients(
-                    loss_G, var_list=self.G.trainable_variables())
+                    loss_G, var_list=self.G.trainable_variables(self.G.name+'/'+'ocd_decoder'))
 
         self.__class__.num_Model += 1
         logging.info('\tbuild {} on {} succesfully! total model number: {}'.format(
