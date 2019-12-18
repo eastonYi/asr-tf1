@@ -29,7 +29,7 @@ dirs:
         char: /mnt/lustre/xushuang2/easton/data/aishell/char/test-7k.char
         tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/test-7k_phone_char
     text:
-        data: /mnt/lustre/xushuang2/easton/data/aishell/phone/text-120k.phone67
+        data: /mnt/lustre/xushuang2/easton/data/aishell/char/text.char
     type: scp_multi
     vocab_phone: /mnt/lustre/xushuang2/easton/data/aishell/phone/phones_67+1.vocab
     vocab: /mnt/lustre/xushuang2/easton/data/aishell/char/char_2818.vocab
@@ -71,9 +71,9 @@ model_D:
 
 # lr_type: constant_learning_rate
 optimizer: adam
-rate: 2.0
-lr_G: 0.00001
-lr_D: 0.00001
+rate: 0.2
+lr_G: 0.0001
+lr_D: 0.0001
 lr: 0.00001
 warmup_steps: 2000
 peak: 0.001
@@ -95,7 +95,7 @@ batch_size: 150
 beam_size: 1
 text_batch_size: 200
 max_feat_len: 1230
-max_label_len: 20
+max_label_len: 30
 num_batch_tokens: 40000
 bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
 

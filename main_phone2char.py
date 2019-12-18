@@ -112,7 +112,7 @@ def train():
             # loss_G, shape_batch, _, (ctc_loss, ce_loss, *_) = sess.run(G.list_run)
 
             # untrain
-            for _ in range(2):
+            for _ in range(5):
                 text = sess.run(iter_text)
                 text_lens = get_batch_length(text)
                 shape_text = text.shape
