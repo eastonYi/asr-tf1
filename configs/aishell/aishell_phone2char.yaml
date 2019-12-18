@@ -71,9 +71,9 @@ model_D:
 
 # lr_type: constant_learning_rate
 optimizer: adam
-rate: 0.1
-lr_G: 0.0001
-lr_D: 0.0001
+rate: 2.0
+lr_G: 0.00001
+lr_D: 0.00001
 lr: 0.00001
 warmup_steps: 2000
 peak: 0.001
@@ -89,13 +89,13 @@ num_epochs: 999
 
 # gpus: '0,1,2,3'
 # gpus: '1,2,3'
-gpus: '4,5,6,7'
-# gpus: '4,5'
+# gpus: '4,5,6,7'
+gpus: '4,5'
 batch_size: 150
 beam_size: 1
 text_batch_size: 200
 max_feat_len: 1230
-max_label_len: 60
+max_label_len: 20
 num_batch_tokens: 40000
 bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
 

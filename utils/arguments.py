@@ -1,17 +1,30 @@
 import logging
 import sys
+import os
 import yaml
 from pathlib import Path
+from argparse import ArgumentParser
 logging.basicConfig(level=logging.INFO, stream=sys.stdout, format='%(levelname)s(%(filename)s:%(lineno)d): %(message)s')
 
 from .dataProcess import load_vocab
 from models.utils.tfData import TFData
 from .tools import mkdirs, AttrDict
 
+parser = ArgumentParser()
+parser.add_argument('-m', type=str, dest='mode', default='train')
+parser.add_argument('--name', type=str, dest='name', default=None)
+parser.add_argument('--gpu', type=str, dest='gpu', default=None)
+parser.add_argument('-c', type=str, dest='config')
 
-CONFIG_FILE = sys.argv[-1]
+param = parser.parse_args()
+
+CONFIG_FILE = param.config
 args = AttrDict(yaml.load(open(CONFIG_FILE), Loader=yaml.SafeLoader))
 
+args.mode = param.mode
+
+args.gpus = param.gpu if param.gpu else args.gpus
+os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
 args.num_gpus = len(args.gpus.split(','))
 args.list_gpus = ['/gpu:{}'.format(i) for i in range(args.num_gpus)]
 
@@ -31,6 +44,8 @@ logging.info('\nbucket_boundaries: {} \nbatch_size: {}'.format(
 dir_dataInfo = Path.cwd() / 'data'
 dir_exps = Path.cwd() / 'exps' / args.dirs.exp
 args.dir_exps = dir_exps / CONFIG_FILE.split('/')[-1].split('.')[0]
+if param.name:
+    args.dir_exps = args.dir_exps / param.name
 args.dir_log = args.dir_exps / 'log'
 args.dir_checkpoint = args.dir_exps / 'checkpoint'
 args.dirs.train.tfdata = Path(args.dirs.train.tfdata) if args.dirs.train.tfdata else None

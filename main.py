@@ -334,42 +334,20 @@ def save(gpu, name=0):
 
 
 if __name__ == '__main__':
-    from argparse import ArgumentParser
 
-    parser = ArgumentParser()
-    parser.add_argument('-m', type=str, dest='mode', default='train')
-    parser.add_argument('--name', type=str, dest='name', default=None)
-    parser.add_argument('--gpu', type=str, dest='gpu', default=0)
-    parser.add_argument('-c', type=str, dest='config')
-
-    param = parser.parse_args()
-
-    if param.gpu:
-        args.gpus = param.gpu
     print('CUDA_VISIBLE_DEVICES: ', args.gpus)
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
+    logging.info('enter the {} phrase'.format(args.mode))
 
-    if param.mode == 'infer':
-        logging.info('enter the INFERING phrase')
+    if args.mode == 'infer':
         infer()
 
-    elif param.mode == 'infer_lm':
-        logging.info('enter the INFERING phrase')
+    elif args.mode == 'infer_lm':
         infer_lm()
 
-    elif param.mode == 'save':
-        logging.info('enter the SAVING phrase')
-        save(gpu=param.gpu, name=param.name)
+    elif args.mode == 'save':
+        save(gpu=args.gpu, name=args.name)
 
-    elif param.mode == 'train':
-        if param.name:
-            args.dir_exps = args.dir_exps / param.name
-            args.dir_log = args.dir_exps / 'log'
-            args.dir_checkpoint = args.dir_exps / 'checkpoint'
-            if not args.dir_exps.is_dir(): args.dir_exps.mkdir()
-            if not args.dir_log.is_dir(): args.dir_log.mkdir()
-            if not args.dir_checkpoint.is_dir(): args.dir_checkpoint.mkdir()
-        logging.info('enter the TRAINING phrase')
+    elif args.mode == 'train':
         train()
 
         # python ../../main.py -m save --gpu 1 --name kin_asr -c configs/rna_char_big3.yaml

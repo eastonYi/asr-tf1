@@ -201,19 +201,19 @@ class GAN:
         #         decay_rate=0.5,
         #         decay_steps=self.args.decay_steps)
 
-        # self.optimizer_D = tf.train.AdamOptimizer(self.learning_rate_D,
-        #                                           beta1=0.5,
-        #                                           beta2=0.9,
-        #                                           epsilon=1e-9,
-        #                                           name='optimizer_D')
+        self.optimizer_D = tf.train.AdamOptimizer(self.learning_rate_D,
+                                                  beta1=0.5,
+                                                  beta2=0.9,
+                                                  epsilon=1e-9,
+                                                  name='optimizer_D')
 
-        # self.optimizer_G = tf.train.AdamOptimizer(self.learning_rate_G,
-        #                                           beta1=0.5,
-        #                                           beta2=0.9,
-        #                                           epsilon=1e-9,
-        #                                           name='optimizer_G')
-        self.optimizer_G = tf.train.RMSPropOptimizer(self.learning_rate_G)
-        self.optimizer_D = tf.train.RMSPropOptimizer(self.learning_rate_D)
+        self.optimizer_G = tf.train.AdamOptimizer(self.learning_rate_G,
+                                                  beta1=0.1,
+                                                  beta2=0.5,
+                                                  epsilon=1e-9,
+                                                  name='optimizer_G')
+        # self.optimizer_G = tf.train.RMSPropOptimizer(self.learning_rate_G)
+        # self.optimizer_D = tf.train.RMSPropOptimizer(self.learning_rate_D)
 
 
 class Conditional_GAN(GAN):
@@ -468,7 +468,11 @@ class GAN_2(GAN):
                 gradients_D = self.optimizer_D.compute_gradients(
                     loss_D, var_list=self.D.trainable_variables())
                 gradients_G = self.optimizer_G.compute_gradients(
-                    loss_G, var_list=self.G.trainable_variables(self.G.name+'/'+'ocd_decoder'))
+                    # loss_G, var_list=self.G.trainable_variables(self.G.name+'/'+'ocd_decoder'))
+                    loss_G, var_list=self.G.trainable_variables(self.G.name+'/ocd_decoder/'+'dense')+\
+                                     self.G.trainable_variables(self.G.name+'/ocd_decoder/'+'dense_1')+\
+                                     self.G.trainable_variables(self.G.name+'/ocd_decoder/'+'dense_2')+\
+                                     self.G.trainable_variables(self.G.name+'/ocd_decoder/'+'fully_connected'))
 
         self.__class__.num_Model += 1
         logging.info('\tbuild {} on {} succesfully! total model number: {}'.format(

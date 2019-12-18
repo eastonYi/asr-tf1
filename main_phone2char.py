@@ -10,9 +10,9 @@ from tqdm import tqdm
 import numpy as np
 import editdistance as ed
 
+from utils.arguments import args
 from models.utils.tools import get_session, create_embedding, size_variables
 from models.utils.tfData import TFReader, readTFRecord_multilabel, TFData
-from utils.arguments import args
 from utils.dataset import ASR_Multi_DataLoader, TextDataSet
 from utils.summaryTools import Summary
 # from utils.performanceTools import dev, decode_test
@@ -112,7 +112,7 @@ def train():
             # loss_G, shape_batch, _, (ctc_loss, ce_loss, *_) = sess.run(G.list_run)
 
             # untrain
-            for _ in range(5):
+            for _ in range(2):
                 text = sess.run(iter_text)
                 text_lens = get_batch_length(text)
                 shape_text = text.shape
@@ -330,33 +330,10 @@ def decode_test(step, sample, model, sess, unit, args):
 
 
 if __name__ == '__main__':
-    from argparse import ArgumentParser
-
-    parser = ArgumentParser()
-    parser.add_argument('-m', type=str, dest='mode', default='train')
-    parser.add_argument('--name', type=str, dest='name', default=None)
-    parser.add_argument('--gpu', type=str, dest='gpu', default=0)
-    parser.add_argument('-c', type=str, dest='config')
-
-    param = parser.parse_args()
-
-    if param.gpu:
-        args.gpus = param.gpu
-    print('CUDA_VISIBLE_DEVICES: ', args.gpus)
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
-
-    if param.name:
-        args.dir_exps = args.dir_exps / param.name
-        args.dir_log = args.dir_exps / 'log'
-        args.dir_checkpoint = args.dir_exps / 'checkpoint'
-        if not args.dir_exps.is_dir(): args.dir_exps.mkdir()
-        if not args.dir_log.is_dir(): args.dir_log.mkdir()
-        if not args.dir_checkpoint.is_dir(): args.dir_checkpoint.mkdir()
-
-    if param.mode == 'infer':
+    if args.mode == 'infer':
         logging.info('enter the INFERING phrase')
         infer()
-    elif param.mode == 'train':
+    elif args.mode == 'train':
         logging.info('enter the TRAINING phrase')
         train()
 
