@@ -1,0 +1,77 @@
+dirs:
+    exp: aishell
+    train:
+        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
+        trans: /mnt/lustre/xushuang2/easton/data/aishell/char/train-120k.char
+        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-char-120k
+        #scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
+        #phone: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k_rmsil.phone67
+        #char: /mnt/lustre/xushuang2/easton/data/aishell/char/train-120k.char
+        #tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-120k_phone_char
+    dev:
+        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.dev-14k.scp
+        trans: /mnt/lustre/xushuang2/easton/data/aishell/char/dev-14k.char
+        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/dev-char-14k
+    test:
+        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.test-7k.scp
+        trans: /mnt/lustre/xushuang2/easton/data/aishell/char/test-7k.char
+        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/test-char-7k
+    type: scp
+    vocab: /mnt/lustre/xushuang2/easton/data/aishell/char/char_2818.vocab
+    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc2/1k/checkpoint/model-599
+    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc2/Ectc_Docd/checkpoint/model-10799
+
+data:
+    featType: mfcc
+    left_context: 0
+    right_context: 0
+    downsample: 1
+    add_delta: False
+    unit: word
+
+model:
+    type: ctcModel
+    confidence_penalty: 0.2
+    encoder:
+        type: conv2
+        # type: conv_lstm
+        num_filters: 256
+        num_blocks: 2
+    decoder:
+        type: FC
+        hidden_size: 256
+        num_fc: 2
+        label_smoothing: 0.95
+
+# lr_type: constant_learning_rate
+optimizer: adam
+# lr: 0.00001
+# warmup_steps: 2000
+# peak: 0.001
+# decay_steps: 3000
+warmup_steps: 1000
+peak: 0.0005
+decay_steps: 2000
+
+dev_step: 200
+decode_step: 200
+save_step: 200
+num_epochs: 99999
+
+# gpus: '0,1,2,3'
+# gpus: '4,5'
+# gpus: '4,5,6,7'
+gpus: '6,7'
+batch_size: 200
+beam_size: 1
+text_batch_size: 200
+max_feat_len: 1230
+max_label_len: 60
+num_batch_tokens: 200000
+bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
+
+lambda_lm: 0.0
+lambda_l2: 0.0
+grad_clip_value: 0.0
+grad_clip_norm: 0.0
+grad_clip_global_norm: 0.0

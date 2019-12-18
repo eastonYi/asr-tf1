@@ -44,8 +44,8 @@ if not args.dir_checkpoint.is_dir(): args.dir_checkpoint.mkdir()
 
 # vocab
 args.token2idx, args.idx2token = load_vocab(args.dirs.vocab)
-if args.dirs.phone_vocab:
-    args.phone2idx, args.idx2phone = load_vocab(args.dirs.phone_vocab)
+if args.dirs.vocab_phone:
+    args.phone2idx, args.idx2phone = load_vocab(args.dirs.vocab_phone)
 args.dim_output = len(args.token2idx)
 if '<eos>' in args.token2idx.keys():
     args.eos_idx = args.token2idx['<eos>']
@@ -89,23 +89,26 @@ if args.dirs.type == 'scp':
         args=args,
         _shuffle=False,
         transform=True)
-if args.dirs.type == 'scp_multi':
+elif args.dirs.type == 'scp_multi':
     from .dataset import ASR_phone_char_ArkDataSet
     dataset_train = ASR_phone_char_ArkDataSet(
         f_scp=args.dirs.train.scp,
-        f_trans=args.dirs.train.trans,
+        f_phone=args.dirs.train.phone,
+        f_char=args.dirs.train.char,
         args=args,
         _shuffle=True,
         transform=False)
     dataset_dev = ASR_phone_char_ArkDataSet(
         f_scp=args.dirs.dev.scp,
-        f_trans=args.dirs.dev.trans,
+        f_phone=args.dirs.dev.phone,
+        f_char=args.dirs.dev.char,
         args=args,
         _shuffle=False,
         transform=False)
     dataset_test = ASR_phone_char_ArkDataSet(
         f_scp=args.dirs.test.scp,
-        f_trans=args.dirs.test.trans,
+        f_phone=args.dirs.test.phone,
+        f_char=args.dirs.test.char,
         args=args,
         _shuffle=False,
         transform=True)
@@ -207,6 +210,8 @@ elif args.model.type == 'ctcModel_EODM':
     from models.ctcModel_EODM import CTCModel as Model
 elif args.model.type == 'Ectc_Docd':
     from models.Ectc_Docd import Ectc_Docd as Model
+elif args.model.type == 'Ectc_Docd_Multi':
+    from models.Ectc_Docd import Ectc_Docd_Multi as Model
 elif args.model.type == 'ctc_ce':
     from models.CTC_CE import CTC_CE as Model
 elif args.model.type == 'classifier':
@@ -226,5 +231,5 @@ if args.model_D:
         raise NotImplementedError('not found Model type!')
     args.Model_D = Model_D
 
-    from models.gan import GAN
+    from models.gan import GAN_2 as GAN
     args.GAN = GAN

@@ -52,9 +52,11 @@ class Ectc_Docd(CTCModel):
             # encoded = batch_splice(feature, 5, 5)
             with tf.variable_scope(decoder.name or 'decoder'):
                 encoded, len_encoded = encoder(feature, len_features)
-                encoded = batch_splice(encoded, 0, 3, jump=False)
                 encoded_shrunk, len_encoded_shrunk = shrink_layer(
                     encoded, len_encoded, logits_ctc, encoded.get_shape()[-1])
+                if not self.args.model.decoder.half:
+                    encoded_shrunk = batch_splice(encoded_shrunk, 0, 0, jump=True)
+                    len_encoded_shrunk = tf.cast(tf.ceil(tf.cast(len_encoded_shrunk, tf.float32)/2), tf.int32)
                 logits_ocd, decoded, len_logits_ocd = decoder(encoded_shrunk, len_encoded_shrunk, None)
 
         return [logits_ctc, logits_ocd], [align, decoded], [len_logits_ctc, len_logits_ocd]
@@ -101,9 +103,9 @@ class Ectc_Docd(CTCModel):
                     labels=labels[:, :min_len],
                     len_labels=len_labels)
 
-                loss = ctc_loss + ce_loss + 0.2*ce_blk_loss
+                # loss = ctc_loss + ce_loss + 0.2*ce_blk_loss
                 # loss = ctc_loss
-                # loss = ctc_loss + ce_loss
+                loss = ctc_loss + ce_loss
 
                 if self.args.model.confidence_penalty:
                     cp_loss = self.args.model.confidence_penalty * confidence_penalty(logits_ctc, len_logits_ctc)
@@ -254,5 +256,26 @@ class Ectc_Docd_Multi(Ectc_Docd):
                 tensors_input.len_phone_splits = tf.split(self.batch[4], self.num_gpus, name="len_phone_splits")
                 tensors_input.len_label_splits = tf.split(self.batch[5], self.num_gpus, name="len_label_splits")
         tensors_input.shape_batch = tf.shape(self.batch[0])
+
+        return tensors_input
+
+    def build_infer_input(self):
+        tensors_input = namedtuple('tensors_input',
+            'feature_splits, phone_splits, label_splits, len_feat_splits, len_phone_splits,　len_label_splits, shape_batch')
+
+        with tf.device(self.center_device):
+            with tf.name_scope("inputs"):
+                batch_features = tf.placeholder(tf.float32, [None, None, self.args.data.dim_input], name='input_feature')
+                batch_feat_lens = tf.placeholder(tf.int32, [None], name='input_fea_lens')
+                self.list_pl = [batch_features, batch_feat_lens]
+                # split input data alone batch axis to gpus
+                tensors_input.feature_splits = tf.split(batch_features, self.num_gpus, name="feature_splits")
+                tensors_input.len_feat_splits = tf.split(batch_feat_lens, self.num_gpus, name="len_feat_splits")
+
+        tensors_input.label_splits = None
+        tensors_input.len_label_splits = None
+        tensors_input.phone_splits = None
+        tensors_input.len_phone_splits = None
+        tensors_input.shape_batch = tf.shape(batch_features)
 
         return tensors_input

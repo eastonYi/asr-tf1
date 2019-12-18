@@ -158,37 +158,49 @@ class ASR_phone_char_ArkDataSet(ASR_scp_DataSet):
             phone
         -
     """
-    def __init__(self, f_scp, phone_trans, char_trans, feat_len_file, args, _shuffle, transform):
-        super().__init__(f_scp, char_trans, args, _shuffle, transform)
+    def __init__(self, f_scp, f_phone, f_char, args, _shuffle, transform):
+        self.phone2idx, self.idx2phone = args.phone2idx, args.idx2phone
+        super().__init__(f_scp, f_char, args, _shuffle, transform)
         self.phone_char_rate = 2.0
-        self.dict_phone_trans = self.load_trans(phone_trans)
-        self.dict_char_trans = self.load_trans(char_trans)
-        self.list_uttids = set(self.dict_phone_trans.keys()) & set(self.dict_char_trans.keys())
+        self.dict_phone_trans = self.load_trans(f_phone)
+        self.dict_char_trans = self.load_trans(f_char)
+        self.list_uttids = list(set(self.dict_phone_trans.keys()) & set(self.dict_char_trans.keys()))
 
         if _shuffle:
             shuffle(self.list_uttids)
 
-    def __getitem__(self, id):
-        uttid = self.list_uttids[id]
+    def __getitem__(self, idx):
+        sample = {}
 
-        feat = self.reader.read_utt_data(id)
-        if self.transform:
-            feat = process_raw_feature(feat, self.args)
-        char_trans = self.dict_char_trans[uttid]
-        phone_trans = self.dict_phone_trans[uttid]
-        char_trans = self.fix_char(phone_trans, char_trans)
-        sample = {'uttid': uttid,
-                  'feature': feat,
-                  'char': char_trans,
-                  'phone': phone_trans}
+        try:
+            sample['uttid'] = uttid = self.list_uttids[idx]
+            sample['feature'] = self.reader.read_utt_data(uttid)
+            if self.transform:
+                sample['feature'] = process_raw_feature(sample['feature'], self.args)
+
+            phones = self.dict_phone_trans[uttid]
+            chars = self.dict_char_trans[uttid]
+            sample['phone'] = np.array(
+                [self.phone2idx[token] for token in phones], dtype=np.int32)
+            sample['label'] = np.array(
+                [self.token2idx.get(token, self.token2idx['<unk>'])
+                for token in chars],
+                dtype=np.int32)
+            if not self.fix_char(sample['phone'], sample['label']):
+                sample = None
+        except:
+            print('Not found {}!'.format(self.reader.utt_ids[idx]))
+            sample = None
 
         return sample
 
     def fix_char(self, phone_trans, char_trans):
+        res = True
         if len(phone_trans) / len(char_trans) != self.phone_char_rate:
             print(phone_trans)
             print(char_trans)
-        return char_trans
+            res = False
+        return res
 
 
 class ASR_align_DataSet(ASRDataSet):
@@ -849,3 +861,59 @@ class ASRDataLoader(DataLoader):
 
     def __len__(self):
         return self.size_dataset
+
+
+class ASR_Multi_DataLoader(ASRDataLoader):
+    def __init__(self, dataset, args, feat, phone, label, batch_size, num_loops, num_thread=4, size_queue=2000):
+        super().__init__(dataset, args, feat, label, batch_size, num_loops, num_thread, size_queue)
+        self.phone = phone
+
+    def __iter__(self):
+        buckets = self.args.list_bucket_boundaries
+        # max_length = buckets[-1]
+        caches = defaultdict(lambda: [[], [], [], 0])
+        for _ in range(len(self)*self.num_loops):
+            seq_features, seq_phones, seq_labels = self.sess.run([self.feat, self.phone, self.label])
+
+            id_bucket, bucket = size_bucket_to_put(len(seq_features), buckets)
+            if bucket is None:
+                continue
+            caches[bucket][0].append(seq_features)
+            caches[bucket][1].append(seq_phones)
+            caches[bucket][2].append(seq_labels)
+
+            caches[bucket][3] += 1
+            if caches[bucket][3] >= self.list_batch_size[id_bucket]:
+                batch = (caches[bucket][0], caches[bucket][1], caches[bucket][2])
+                yield self.padding_list_seq_with_multi_labels(*batch)
+                caches[bucket] = [[], [], [], 0]
+
+        # Clean remain samples.
+        for bucket in buckets:
+            if caches[bucket][3] > 0:
+                batch = (caches[bucket][0], caches[bucket][1], caches[bucket][2])
+                yield self.padding_list_seq_with_multi_labels(*batch)
+                caches[bucket] = [[], [], [], 0]
+                # logging.info('empty the bucket {}'.format(bucket))
+
+    @staticmethod
+    def padding_list_seq_with_multi_labels(list_seqs_features,
+                                           list_seqs_phones,
+                                           list_seqs_labels,
+                                           dtype=np.float32,
+                                           value1=0.,
+                                           value2=0):
+        x, len_x = DataLoader.padding_list_seqs(
+            list_seqs=list_seqs_features,
+            dtype=dtype,
+            pad=value1)
+        y, len_y = DataLoader.padding_list_seqs(
+            list_seqs=list_seqs_phones,
+            dtype=np.int32,
+            pad=value2)
+        y1, len_y1 = DataLoader.padding_list_seqs(
+            list_seqs=list_seqs_labels,
+            dtype=np.int32,
+            pad=value2)
+
+        return [x, y, y1, len_x, len_y, len_y1]

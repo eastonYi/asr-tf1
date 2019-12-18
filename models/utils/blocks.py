@@ -15,7 +15,7 @@ def shrink_layer(encoded, len_encoded, logits, dim_hidden):
     flag = tf.logical_and(flag_norepeat, frames_mark)
     flag = tf.logical_and(flag, tf.sequence_mask(len_encoded, tf.shape(logits)[1], tf.bool))
     len_labels = tf.reduce_sum(tf.cast(flag, tf.int32), -1)
-    max_label_len = tf.reduce_max(len_labels)
+    max_label_len = tf.reduce_max([tf.reduce_max(len_labels), 1])
     hidden_output = tf.zeros([0, max_label_len, dim_hidden], tf.float32)
 
     def sent(b, hidden_output):

@@ -187,7 +187,7 @@ def save2tfrecord_multilabel(dataset, dir_save, size_file=5000000):
                 features=tf.train.Features(
                     feature={'feature': _bytes_feature(sample['feature'].tostring()),
                              'phone': _bytes_feature(sample['phone'].tostring()),
-                             'char': _bytes_feature(sample['char'].tostring())}
+                             'label': _bytes_feature(sample['label'].tostring())}
                 )
             )
             writer.write(example.SerializeToString())
@@ -224,14 +224,14 @@ def readTFRecord_multilabel(dir_data, args, _shuffle=False, transform=False):
         serialized_example,
         features={'feature': tf.FixedLenFeature([], tf.string),
                   'phone': tf.FixedLenFeature([], tf.string),
-                  'char': tf.FixedLenFeature([], tf.string)
+                  'label': tf.FixedLenFeature([], tf.string)
                   }
     )
 
     feature = tf.reshape(tf.decode_raw(features['feature'], tf.float32),
         [-1, args.data.dim_feature])[:2000, :]
     phone = tf.decode_raw(features['phone'], tf.int32)
-    label = tf.decode_raw(features['char'], tf.int32)
+    label = tf.decode_raw(features['label'], tf.int32)
 
     if transform:
         feature = process_raw_feature(feature, args)
@@ -274,7 +274,7 @@ class TFReader:
         self.sess = None
         self.list_batch_size = self.args.list_batch_size
         self.list_bucket_boundaries = self.args.list_bucket_boundaries
-        if args.vocab_phone:
+        if args.dirs.vocab_phone:
             self.feat, self.phone, self.label = readTFRecord_multilabel(
                 dir_tfdata,
                 args,
@@ -310,18 +310,26 @@ class TFReader:
 
         return list_outputs[0], list_outputs[1], seq_len_feats, seq_len_label
 
+    def fentch_multi_batch_bucket(self):
+        list_inputs = [self.feat, self.phone, self.label,
+                       tf.shape(self.feat)[0], tf.shape(self.phone)[0], tf.shape(self.label)[0]]
+        _, list_outputs = tf.contrib.training.bucket_by_sequence_length(
+            input_length=list_inputs[3],
+            tensors=list_inputs,
+            batch_size=self.list_batch_size,
+            bucket_boundaries=self.list_bucket_boundaries,
+            num_threads=8,
+            bucket_capacities=[i*2 for i in self.list_batch_size],
+            capacity=30,  # size of the top queue
+            dynamic_pad=True,
+            allow_smaller_final_batch=True)
+        seq_len_feats = tf.reshape(list_outputs[3], [-1])
+        seq_len_phone = tf.reshape(list_outputs[4], [-1])
+        seq_len_label = tf.reshape(list_outputs[5], [-1])
+
+        return list_outputs[0], list_outputs[1], list_outputs[2], seq_len_feats, seq_len_phone, seq_len_label
+
     def fentch_batch_bucket(self):
-        """
-        the input tensor length is not equal,
-        so will add the len as a input tensor
-        list_inputs: [tensor1, tensor2]
-        added_list_inputs: [tensor1, tensor2, len_tensor1, len_tensor2]
-        capacity: An integer. The maximum number of minibatches in the top queue,
-            and also the maximum number of elements within each bucket.
-        bucket_capacities: (Optional) None or a list of integers, the capacities of each bucket.
-            If None, capacity is used (default). If specified, it must be a list of integers of length one larger than bucket_boundaries.
-            Its i-th element is used as capacity for the i-th bucket queue.
-        """
         list_inputs = [self.feat, self.label, tf.shape(self.feat)[0], tf.shape(self.label)[0]]
         _, list_outputs = tf.contrib.training.bucket_by_sequence_length(
             input_length=list_inputs[2],
