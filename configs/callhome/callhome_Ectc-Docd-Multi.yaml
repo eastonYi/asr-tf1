@@ -1,0 +1,96 @@
+dirs:
+    exp: callhome
+    train:
+        scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.scp
+        phone: /home/easton/data/CALLHOME/Mandarin/train_dim80/train_rmsil.phone
+        char: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.char
+        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train_phone_char
+    untrain:
+        scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.scp
+        phone: /home/easton/data/CALLHOME/Mandarin/train_dim80/train_rmsil.phone
+        char: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.char
+        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train_phone_char
+    dev:
+        scp: /home/easton/data/CALLHOME/Mandarin/dev_dim80/dev.scp
+        phone: /home/easton/data/CALLHOME/Mandarin/dev_dim80/dev_rmsil.phone
+        char: /home/easton/data/CALLHOME/Mandarin/dev_dim80/dev.char
+        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/dev_phone_char
+    test:
+        scp: /home/easton/data/CALLHOME/Mandarin/test_dim80/test.scp
+        phone: /home/easton/data/CALLHOME/Mandarin/test_dim80/test_rmsil.phone
+        char: /home/easton/data/CALLHOME/Mandarin/test_dim80/test.char
+        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/test_phone_char
+    text:
+        data: /home/easton/data/HKUST/train/text.char
+    type: scp_multi
+    vocab_phone: /home/easton/data/CALLHOME/Mandarin/phones.vocab
+    vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
+    # checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_Ectc_Docd_2/120k_ctc/checkpoint/model_G-17799
+
+data:
+    featType: mfcc
+    left_context: 0
+    right_context: 0
+    downsample: 1
+    add_delta: False
+    unit: word
+
+model:
+    type: Ectc_Docd_Multi
+    dropout: 0.05
+    confidence_penalty: 0.2
+    encoder:
+        type: conv2
+        num_filters: 256
+        num_blocks: 2
+    decoder:
+        type: conv_decoder
+        num_blocks: 2
+        num_filters: 64
+        hidden_size: 256
+        num_fc: 2
+        label_smoothing: 0.95
+        left_splice: 0
+        right_splice: 0
+        half: True
+model_D:
+    type: clm
+    hidden_size: 256
+    num_blocks: 5
+    num_fc: 2
+
+# lr_type: constant_learning_rate
+optimizer: adam
+rate: 0.1
+lr_G: 0.0001
+lr_D: 0.0001
+lr: 0.00001
+warmup_steps: 2000
+peak: 0.001
+decay_steps: 3000
+# warmup_steps: 1000
+# peak: 0.0002
+# decay_steps: 1200
+
+dev_step: 200
+decode_step: 200
+save_step: 200
+num_epochs: 999
+
+# gpus: '0,1,2,3'
+# gpus: '1,2,3'
+# gpus: '4,5,6,7'
+gpus: '4,5'
+batch_size: 150
+beam_size: 1
+text_batch_size: 200
+max_feat_len: 1230
+max_label_len: 20
+num_batch_tokens: 40000
+bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
+
+lambda_lm: 0.0
+lambda_l2: 0.0
+grad_clip_value: 0.0
+grad_clip_norm: 0.0
+grad_clip_global_norm: 0.0

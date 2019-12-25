@@ -51,11 +51,11 @@ args.dir_checkpoint = args.dir_exps / 'checkpoint'
 args.dirs.train.tfdata = Path(args.dirs.train.tfdata) if args.dirs.train.tfdata else None
 args.dirs.dev.tfdata = Path(args.dirs.dev.tfdata) if args.dirs.dev.tfdata else None
 
-if not dir_dataInfo.is_dir(): dir_dataInfo.mkdir()
-if not dir_exps.is_dir(): dir_exps.mkdir()
-if not args.dir_exps.is_dir(): args.dir_exps.mkdir()
-if not args.dir_log.is_dir(): args.dir_log.mkdir()
-if not args.dir_checkpoint.is_dir(): args.dir_checkpoint.mkdir()
+mkdirs(dir_dataInfo)
+mkdirs(dir_exps)
+mkdirs(args.dir_exps)
+mkdirs(args.dir_log)
+mkdirs(args.dir_checkpoint)
 
 # vocab
 args.token2idx, args.idx2token = load_vocab(args.dirs.vocab)

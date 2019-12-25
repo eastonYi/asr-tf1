@@ -92,27 +92,28 @@ def train():
         if args.dirs.checkpoint_G_en:
             saver_G_en.restore(sess, args.dirs.checkpoint_G_en)
 
-        # for i in range(500):
-        #     ctc_loss, *_ = sess.run(G.list_run)
-        #     if i % 100 == 0:
-        #         print('i: {} ctc_loss: {:.2f}'.format(i, ctc_loss))
-        # saver_G_en.save(get_session(sess), str(args.dir_checkpoint/'model_G_en'), global_step=0, write_meta_graph=True)
-        # print('saved model in',  str(args.dir_checkpoint)+'/model_G_en-0')
-
         batch_time = time()
         num_processed = 0
         num_processed_unbatch = 0
         progress = 0
         while progress < args.num_epochs:
 
+            # # supervised training
             # global_step, lr = sess.run([tensor_global_step, G.learning_rate])
+            # loss_G, shape_batch, _, (ctc_loss, ce_loss, *_) = sess.run(G.list_run)
+            # num_processed += shape_batch[0]
+            # used_time = time()-batch_time
+            # batch_time = time()
+            # progress = num_processed/args.data.train_size
+            #
+            # if global_step % 40 == 0:
+            #     print('ctc_loss: {:.2f}, ce_loss: {:.2f} batch: {} lr:{:.1e} {:.2f}s {:.3f}% step: {}'.format(
+            #          np.mean(ctc_loss), np.mean(ce_loss), shape_batch, lr, used_time, progress*100, global_step))
+
+            # semi_supervise
             global_step, lr_G, lr_D = sess.run([tensor_global_step0, gan.learning_rate_G, gan.learning_rate_D])
 
-            # supervised training
-            # loss_G, shape_batch, _, (ctc_loss, ce_loss, *_) = sess.run(G.list_run)
-
-            # untrain
-            for _ in range(5):
+            for _ in range(2):
                 text = sess.run(iter_text)
                 text_lens = get_batch_length(text)
                 shape_text = text.shape
@@ -124,15 +125,13 @@ def train():
                 sess.run([gan.list_train_G, gan.list_feature_shape])
 
             num_processed += shape_batch[0]
-            num_processed_unbatch += shape_unbatch[0]
+            # num_processed_unbatch += shape_unbatch[0]
             used_time = time()-batch_time
             batch_time = time()
             progress = num_processed/args.data.train_size
             progress_unbatch = num_processed_unbatch/args.data.untrain_size
 
             if global_step % 40 == 0:
-                # print('ctc_loss: {:.2f}, ce_loss: {:.2f} batch: {} lr:{:.1e} {:.2f}s {:.3f}% step: {}'.format(
-                #      np.mean(ctc_loss), np.mean(ce_loss), shape_batch, lr, used_time, progress*100, global_step))
                 print('ctc|ce loss: {:.2f}|{:.2f}, loss res|real|gp: {:.2f}|{:.2f}|{:.2f}\tlr:{:.1e}|{:.1e} {:.2f}s {:.3f}% step: {}'.format(
                        np.mean(ctc_loss), np.mean(ce_loss), loss_D_res, loss_D_text, loss_gp, lr_G, lr_D, used_time, progress*100, global_step))
                 summary.summary_scalar('ctc_loss', np.mean(ctc_loss), global_step)

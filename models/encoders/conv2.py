@@ -50,10 +50,6 @@ class CONV(Encoder):
 
         outputs = tf.reshape(x, [size_batch, size_length, num_filters])
 
-        # for i in range(num_fc):
-        #     x = tf.layers.dense(x, units=hidden_size, use_bias=True)
-        #     x = tf.nn.relu(x)
-
         outputs *= tf.sequence_mask(len_feas,
                               maxlen=tf.shape(outputs)[1],
                               dtype=tf.float32)[:, : , None]

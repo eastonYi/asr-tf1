@@ -1,12 +1,12 @@
 dirs:
     exp: aishell
     train:
-        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-10k.scp
-        trans: /mnt/lustre/xushuang2/easton/data/aishell/char/train-10k.char
-        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-char-10k
-        # scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
-        # trans: /mnt/lustre/xushuang2/easton/data/aishell/char/train-120k.char
-        # tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-char-120k
+        # scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-10k.scp
+        # trans: /mnt/lustre/xushuang2/easton/data/aishell/char/train-10k.char
+        # tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-char-10k
+        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
+        trans: /mnt/lustre/xushuang2/easton/data/aishell/char/train-120k.char
+        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-char-120k
     dev:
         scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.dev-14k.scp
         trans: /mnt/lustre/xushuang2/easton/data/aishell/char/dev-14k.char
@@ -25,22 +25,12 @@ data:
     left_context: 0
     right_context: 0
     downsample: 1
-    add_delta: False
+    add_delta: True
     unit: word
 
 model:
     type: ctcModel
     confidence_penalty: 0.2
-    # encoder:
-    #     type: conv2
-    #     # type: conv_lstm
-    #     num_filters: 256
-    #     num_blocks: 2
-    # decoder:
-    #     type: FC
-    #     hidden_size: 256
-    #     num_fc: 2
-    #     label_smoothing: 0.95
     encoder:
         type: conv_lstm
         num_filters: 64
@@ -52,9 +42,9 @@ model:
         label_smoothing: 0.95
 
 optimizer: adam
-warmup_steps: 500
-peak: 0.0003
-decay_steps: 1000
+warmup_steps: 1200
+peak: 0.0008
+decay_steps: 2000
 
 dev_step: 200
 decode_step: 200
@@ -70,7 +60,7 @@ beam_size: 1
 text_batch_size: 200
 max_feat_len: 1230
 max_label_len: 60
-num_batch_tokens: 200000
+num_batch_tokens: 100000
 bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
 
 lambda_lm: 0.0

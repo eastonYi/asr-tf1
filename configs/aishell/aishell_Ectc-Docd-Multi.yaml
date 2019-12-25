@@ -1,14 +1,14 @@
 dirs:
-    exp: aishell
+    exp: callhome
     train:
-        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-10k.scp
-        phone: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-10k_rmsil.phone67
-        char: /mnt/lustre/xushuang2/easton/data/aishell/char/train-10k.char
-        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-10k_phone_char
-        #scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
-        #phone: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k_rmsil.phone67
-        #char: /mnt/lustre/xushuang2/easton/data/aishell/char/train-120k.char
-        #tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-120k_phone_char
+        # scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-10k.scp
+        # phone: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-10k_rmsil.phone67
+        # char: /mnt/lustre/xushuang2/easton/data/aishell/char/train-10k.char
+        # tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-10k_phone_char
+        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
+        phone: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k_rmsil.phone67
+        char: /mnt/lustre/xushuang2/easton/data/aishell/char/train-120k.char
+        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-120k_phone_char
     untrain:
         scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
         phone: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k_rmsil.phone67
@@ -71,7 +71,7 @@ model_D:
 
 # lr_type: constant_learning_rate
 optimizer: adam
-rate: 0.2
+rate: 0.1
 lr_G: 0.0001
 lr_D: 0.0001
 lr: 0.00001
@@ -95,7 +95,7 @@ batch_size: 150
 beam_size: 1
 text_batch_size: 200
 max_feat_len: 1230
-max_label_len: 30
+max_label_len: 20
 num_batch_tokens: 40000
 bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
 

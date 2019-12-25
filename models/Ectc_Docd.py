@@ -51,7 +51,7 @@ class Ectc_Docd(CTCModel):
             # shrink layer
             # encoded = batch_splice(feature, 5, 5)
             with tf.variable_scope(decoder.name or 'decoder'):
-                encoded, len_encoded = encoder(feature, len_features)
+                # encoded, len_encoded = encoder(feature, len_features)
                 encoded_shrunk, len_encoded_shrunk = shrink_layer(
                     encoded, len_encoded, logits_ctc, encoded.get_shape()[-1])
                 if not self.args.model.decoder.half:
