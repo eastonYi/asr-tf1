@@ -65,49 +65,6 @@ def save2tfrecord(dataset, dir_save, size_file=5000000):
     return
 
 
-# def split_save(self, length_file='feature_length.txt', capacity=50000):
-#     num_token = 0
-#     num_damaged_sample = 0
-#     fw = open(self.dir_save/length_file, 'w')
-#     def serialize_example(uttid, feature):
-#         atts = {
-#             'uttid': self._bytes_feature(bytes(uttid, 'UTF-8')),
-#             'feature': self._bytes_feature(feature.tostring())
-#         }
-#         example_proto = tf.train.Example(features=tf.train.Features(feature=atts))
-#
-#         return example_proto.SerializeToString()
-#
-#     def generator():
-#         nonlocal fw, i, capacity
-#         # for sample, _ in zip(self.dataset, tqdm(range(len(self.dataset)))):
-#         for j in tqdm(range(i*capacity, min((i+1)*capacity, len(self.dataset)))):
-#             sample = self.dataset[j]
-#             line = sample['uttid'] + ' ' + str(len(sample['feature']))
-#             fw.write(line + '\n')
-#             yield serialize_example(sample['uttid'], sample['feature'])
-#
-#     for i in range(len(self.dataset)//capacity + 1):
-#     # for i in [2,3,4]:
-#         dataset_tf = tf.data.Dataset.from_generator(
-#             generator=generator,
-#             output_types=tf.string,
-#             output_shapes=())
-#         record_file = self.dir_save/'{}.recode'.format(i)
-#         mkdirs(record_file)
-#         writer = tf.data.experimental.TFRecordWriter(str(record_file))
-#         writer.write(dataset_tf)
-#
-#     with open(str(self.dir_save/'tfdata.info'), 'w') as fw:
-#         fw.write('data_file {}\n'.format(self.dataset.file))
-#         fw.write('dim_feature {}\n'.format(self.dim_feature))
-#         fw.write('num_tokens {}\n'.format(num_token))
-#         fw.write('size_dataset {}\n'.format(len(self.dataset)-num_damaged_sample))
-#         fw.write('damaged samples: {}\n'.format(num_damaged_sample))
-#
-#     return
-
-
 def readTFRecord(dir_data, args, _shuffle=False, transform=False):
     """
     the tensor could run unlimitatly
@@ -136,30 +93,10 @@ def readTFRecord(dir_data, args, _shuffle=False, transform=False):
     label = tf.decode_raw(features['label'], tf.int32)
     if transform:
         feature = process_raw_feature(feature, args)
+    if args.eos_idx:
+        label = tf.concat([label, [args.eos_idx]], 0)
 
     return feature, label
-    # raw_dataset = tf.data.TFRecordDataset(list_filenames)
-    #
-    # def _parse_function(example_proto):
-    #     sample = tf.io.parse_single_example(
-    #         example_proto,
-    #         features={
-    #             'label': tf.io.FixedLenFeature([], tf.string),
-    #             'feature': tf.io.FixedLenFeature([], tf.string)
-    #         }
-    #     )
-    #     feature = tf.reshape(tf.io.decode_raw(sample['feature'], tf.float32),
-    #                          [-1, args.data.dim_feature])[:3000, :]
-    #     label = tf.decode_raw(sample['label'], tf.int32)
-    #
-    #     return feature, label
-    #
-    # feature, label = raw_dataset.map(_parse_function)
-    #
-    # if transform:
-    #     feature = process_raw_feature(feature, args)
-    #
-    # return feature, label
 
 
 def save2tfrecord_multilabel(dataset, dir_save, size_file=5000000):

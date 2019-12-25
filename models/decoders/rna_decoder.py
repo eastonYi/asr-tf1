@@ -3,9 +3,8 @@ the while_loop implementation'''
 
 import tensorflow as tf
 from .decoder import Decoder
+from ..utils.blocks import make_multi_cell
 from tensorflow.python.util import nest
-from tfModels.tensor2tensor import dcommon_layers
-from tfSeq2SeqModels.tools.utils import dense
 import logging
 
 inf = 1e10
@@ -86,11 +85,12 @@ class RNADecoder(Decoder):
         return logits, preds, len_encoded
 
     def create_cell(self):
-        cell = dcommon_layers.lstm_cells(
-            self.num_layers,
+        cell = make_multi_cell(
             self.num_cell_units_de,
-            initializer=None,
-            dropout=self.dropout)
+            self.is_train,
+            1-self.dropout,
+            self.num_layers,
+            rnn_mode='BLOCK')
 
         return cell
 

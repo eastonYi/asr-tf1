@@ -183,6 +183,8 @@ except:
 ## encoder
 if args.model.encoder.type == 'transformer_encoder':
     from models.encoders.transformer_encoder import Transformer_Encoder as encoder
+elif args.model.encoder.type == 'transformer_encoder_8x':
+    from models.encoders.transformer_encoder import Transformer_Encoder_8x as encoder
 elif args.model.encoder.type == 'conv_lstm':
     from models.encoders.conv_lstm import CONV_LSTM as encoder
 elif args.model.encoder.type == 'classifier':

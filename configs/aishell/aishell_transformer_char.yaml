@@ -1,0 +1,87 @@
+dirs:
+    exp: aishell
+    train:
+        # scp: /home/easton/data/AISHELL/feats/feats.train-10k.scp
+        # trans: /home/easton/data/AISHELL/char/train-10k.char
+        # tfdata: /home/easton/data/AISHELL/phone/tfdata/train-char-10k
+        scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
+        trans: /home/easton/data/AISHELL/char/train-120k.char
+        tfdata: /home/easton/data/AISHELL/phone/tfdata/train-char-120k
+    dev:
+        scp: /home/easton/data/AISHELL/feats/feats.dev-14k.scp
+        trans: /home/easton/data/AISHELL/char/dev-14k.char
+        tfdata: /home/easton/data/AISHELL/phone/tfdata/dev-char-14k
+    test:
+        scp: /home/easton/data/AISHELL/feats/feats.test-7k.scp
+        trans: /home/easton/data/AISHELL/char/test-7k.char
+        tfdata: /home/easton/data/AISHELL/phone/tfdata/test-char-7k
+    type: scp
+    vocab: /home/easton/data/AISHELL/char/char_eos.vocab
+    # checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer_small/checkpoint
+    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer/test2/checkpoint
+
+data:
+    featType: mfcc
+    left_context: 0
+    right_context: 0
+    downsample: 1
+    add_delta: False
+    unit: word
+
+model:
+    type: transformer
+    encoder:
+        type: transformer_encoder_8x
+        num_blocks: 6
+        num_heads: 4
+        num_cell_units: 512
+        attention_dropout_rate: 0.1
+        residual_dropout_rate: 0.1
+    decoder:
+        type: transformer_decoder
+        size_embedding: 512
+        num_blocks: 4
+        num_heads: 4
+        num_cell_units: 512
+        attention_dropout_rate: 0.1
+        residual_dropout_rate: 0.1
+        init_scale: 0.04
+        label_smoothing: 0.98
+        max_decode_len: 60
+model_D:
+    type: clm
+    num_hidden: 512
+    num_blocks: 5
+
+# lr_type: constant_learning_rate
+optimizer: adam
+# lr: 0.00001
+warmup_steps: 8000
+peak: 0.0008
+decay_steps: 12000
+# warmup_steps: 600
+# peak: 0.0002
+# decay_steps: 1000
+
+dev_step: 300
+decode_step: 300
+save_step: 300
+num_epochs: 999
+
+# gpus: '0,1,2,3'
+gpus: '0,1'
+# gpus: '4,5,6,7'
+# gpus: '0'
+batch_size: 8
+beam_size: 1
+text_batch_size: 24
+max_feat_len: 550
+max_label_len: 60
+num_batch_tokens: 26000
+bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
+
+lambda_lm: 0.0
+lambda_l2: 0.0
+grad_clip_value: 0.0
+grad_clip_norm: 0.0
+grad_clip_global_norm: 0.0
