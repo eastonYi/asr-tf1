@@ -6,19 +6,21 @@ dirs:
         # tfdata: /home/easton/data/AISHELL/phone/tfdata/train-char-10k
         scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
         trans: /home/easton/data/AISHELL/char/train-120k.char
-        tfdata: /home/easton/data/AISHELL/phone/tfdata/train-char-120k
+        tfdata: /home/easton/data/AISHELL/phone/tfdata/train-char-120k_1
     dev:
         scp: /home/easton/data/AISHELL/feats/feats.dev-14k.scp
         trans: /home/easton/data/AISHELL/char/dev-14k.char
-        tfdata: /home/easton/data/AISHELL/phone/tfdata/dev-char-14k
+        tfdata: /home/easton/data/AISHELL/phone/tfdata/dev-char-14k_1
     test:
         scp: /home/easton/data/AISHELL/feats/feats.test-7k.scp
         trans: /home/easton/data/AISHELL/char/test-7k.char
-        tfdata: /home/easton/data/AISHELL/phone/tfdata/test-char-7k
+        tfdata: /home/easton/data/AISHELL/phone/tfdata/test-char-7k_1
+        # scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
+        # trans: /home/easton/data/AISHELL/char/train-120k.char
+        # tfdata: /home/easton/data/AISHELL/phone/tfdata/train-char-120k
     type: scp
-    vocab: /home/easton/data/AISHELL/char/char_eos.vocab
-    # checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer_small/checkpoint
-    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer/test2/checkpoint
+    vocab: /home/easton/data/AISHELL/char/char.vocab
+    # checkpoint: /home/easton/projects/asr-tf1/exps/aishell/aishell_transformer_char/120k/checkpoint/model-50399
 
 data:
     featType: mfcc
@@ -27,6 +29,7 @@ data:
     downsample: 1
     add_delta: False
     unit: word
+    add_eos: True
 
 model:
     type: transformer

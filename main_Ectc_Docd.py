@@ -164,9 +164,7 @@ def train():
                     sess=sess,
                     unit=args.data.unit,
                     idx2token=args.idx2token,
-                    eos_idx=args.eos_idx,
-                    min_idx=0,
-                    max_idx=args.dim_output-1)
+                    token2idx=args.token2idx)
                 summary.summary_scalar('dev_cer', cer, global_step)
                 summary.summary_scalar('dev_wer', wer, global_step)
 
@@ -178,9 +176,7 @@ def train():
                     sess=sess,
                     unit=args.data.unit,
                     idx2token=args.idx2token,
-                    eos_idx=None,
-                    min_idx=0,
-                    max_idx=None)
+                    token2idx=args.token2idx)
 
     logging.info('training duration: {:.2f}h'.format((datetime.now()-start_time).total_seconds()/3600))
 
@@ -220,9 +216,9 @@ def infer():
                              model_infer.list_pl[1]: np.array([len(sample['feature'])])}
                 sample_id, shape_batch, _ = sess.run(model_infer.list_run, feed_dict=dict_feed)
                 # decoded, sample_id, decoded_sparse = sess.run(model_infer.list_run, feed_dict=dict_feed)
-                res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, eos_idx=args.eos_idx, min_idx=0, max_idx=args.dim_output-1)
+                res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, args.token2idx)
                 # align_txt = array2text(alignment[0], args.data.unit, args.idx2token, min_idx=0, max_idx=args.dim_output-1)
-                ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, eos_idx=args.eos_idx, min_idx=0, max_idx=args.dim_output-1)
+                ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, args.token2idx)
 
                 list_res_char = list(res_txt)
                 list_ref_char = list(ref_txt)
@@ -248,7 +244,7 @@ def infer():
         logging.info('dev CER {:.3f}:  WER: {:.3f}'.format(total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
 
 
-def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0, max_idx=None):
+def dev(step, dataloader, model, sess, unit, idx2token, token2idx):
     start_time = time()
     batch_time = time()
     processed = 0
@@ -271,15 +267,11 @@ def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0,
         batch_cer_ctc_dist, batch_cer_len = batch_cer(
             result=decoded_ctc,
             reference=batch[1],
-            eos_idx=eos_idx,
-            min_idx=min_idx,
-            max_idx=max_idx)
+            token2idx=token2idx)
         batch_cer_dist, batch_cer_len = batch_cer(
             result=decoded,
             reference=batch[1],
-            eos_idx=eos_idx,
-            min_idx=min_idx,
-            max_idx=max_idx)
+            token2idx=token2idx)
         _cer_ctc = batch_cer_ctc_dist/batch_cer_len
         _cer = batch_cer_dist/batch_cer_len
         total_cer_ctc_dist += batch_cer_ctc_dist
@@ -290,18 +282,14 @@ def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0,
             result=decoded_ctc,
             reference=batch[1],
             idx2token=idx2token,
-            unit=unit,
-            eos_idx=eos_idx,
-            min_idx=min_idx,
-            max_idx=max_idx)
+            token2idx=token2idx,
+            unit=unit)
         batch_wer_dist, batch_wer_len = batch_wer(
             result=decoded,
             reference=batch[1],
             idx2token=idx2token,
-            unit=unit,
-            eos_idx=eos_idx,
-            min_idx=min_idx,
-            max_idx=max_idx)
+            token2idx=token2idx,
+            unit=unit)
         _wer_ctc = batch_wer_ctc_dist/batch_wer_len
         _wer = batch_wer_dist/batch_wer_len
         total_wer_ctc_dist += batch_wer_ctc_dist
@@ -327,15 +315,15 @@ def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0,
     return cer, wer
 
 
-def decode_test(step, sample, model, sess, unit, idx2token, eos_idx=None, min_idx=0, max_idx=None):
+def decode_test(step, sample, model, sess, unit, idx2token, token2idx):
     # sample = dataset_dev[0]
     dict_feed = {model.list_pl[0]: np.expand_dims(sample['feature'], axis=0),
                  model.list_pl[1]: np.array([len(sample['feature'])])}
     (decoded_ctc, decoded), shape_sample, _ = sess.run(model.list_run, feed_dict=dict_feed)
 
-    res_ctc_txt = array2text(decoded_ctc[0], unit, idx2token, eos_idx, min_idx, max_idx)
-    res_txt = array2text(decoded[0], unit, idx2token, eos_idx, min_idx, max_idx)
-    ref_txt = array2text(sample['label'], unit, idx2token, eos_idx, min_idx, max_idx)
+    res_ctc_txt = array2text(decoded_ctc[0], unit, idx2token, token2idx)
+    res_txt = array2text(decoded[0], unit, idx2token, token2idx)
+    ref_txt = array2text(sample['label'], unit, idx2token, token2idx)
 
     logging.warning('length: {}, \nres_ctc: \n{}\nres: \n{}\nref: \n{}'.format(
         shape_sample[1], res_ctc_txt, res_txt, ref_txt))

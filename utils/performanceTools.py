@@ -7,7 +7,7 @@ import sys
 from .textTools import batch_wer, batch_cer, array2text
 
 
-def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0, max_idx=None):
+def dev(step, dataloader, model, sess, unit, idx2token, token2idx):
     start_time = time()
     batch_time = time()
     processed = 0
@@ -28,9 +28,7 @@ def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0,
         batch_cer_dist, batch_cer_len = batch_cer(
             result=decoded,
             reference=batch[1],
-            eos_idx=eos_idx,
-            min_idx=min_idx,
-            max_idx=max_idx)
+            token2idx=token2idx)
         _cer = batch_cer_dist/batch_cer_len
         total_cer_dist += batch_cer_dist
         total_cer_len += batch_cer_len
@@ -39,10 +37,8 @@ def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0,
             result=decoded,
             reference=batch[1],
             idx2token=idx2token,
-            unit=unit,
-            eos_idx=eos_idx,
-            min_idx=min_idx,
-            max_idx=max_idx)
+            token2idx=token2idx,
+            unit=unit)
 
         _wer = batch_wer_dist/batch_wer_len
         total_wer_dist += batch_wer_dist
@@ -65,14 +61,14 @@ def dev(step, dataloader, model, sess, unit, idx2token, eos_idx=None, min_idx=0,
     return cer, wer
 
 
-def decode_test(step, sample, model, sess, unit, idx2token, eos_idx=None, min_idx=0, max_idx=None):
+def decode_test(step, sample, model, sess, unit, idx2token, token2idx):
     # sample = dataset_dev[0]
     dict_feed = {model.list_pl[0]: np.expand_dims(sample['feature'], axis=0),
                  model.list_pl[1]: np.array([len(sample['feature'])])}
     sampled_id, shape_sample, len_logits = sess.run(model.list_run, feed_dict=dict_feed)
 
-    res_txt = array2text(sampled_id[0], unit, idx2token, eos_idx, min_idx, max_idx)
-    ref_txt = array2text(sample['label'], unit, idx2token, eos_idx, min_idx, max_idx)
+    res_txt = array2text(sampled_id[0], unit, idx2token, token2idx)
+    ref_txt = array2text(sample['label'], unit, idx2token, token2idx)
 
     logging.warning('length: {}, res: \n{}\nref: \n{}'.format(
         shape_sample[1], res_txt, ref_txt))

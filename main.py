@@ -79,6 +79,7 @@ def train():
         # for i in range(100):
         #     batch = sess.run(batch_train)
         #     print(batch[0].shape)
+        _, labels, _, len_labels = sess.run(batch_train)
 
         if args.dirs.checkpoint:
             # checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
@@ -95,7 +96,7 @@ def train():
         progress = 0
         while progress < args.num_epochs:
             global_step, lr = sess.run([tensor_global_step, model.learning_rate])
-            loss, shape_batch, _, _ = sess.run(model.list_run)
+            loss, shape_batch, _, debug = sess.run(model.list_run)
 
             num_processed += shape_batch[0]
             used_time = time()-batch_time
@@ -119,10 +120,8 @@ def train():
                     model=model_infer,
                     sess=sess,
                     unit=args.data.unit,
-                    idx2token=args.idx2token,
-                    eos_idx=args.eos_idx,
-                    min_idx=0,
-                    max_idx=args.dim_output-1)
+                    token2idx=args.token2idx,
+                    idx2token=args.idx2token)
                 summary.summary_scalar('dev_cer', cer, global_step)
                 summary.summary_scalar('dev_wer', wer, global_step)
 
@@ -134,9 +133,7 @@ def train():
                     sess=sess,
                     unit=args.data.unit,
                     idx2token=args.idx2token,
-                    eos_idx=None,
-                    min_idx=0,
-                    max_idx=None)
+                    token2idx=args.token2idx)
 
     logging.info('training duration: {:.2f}h'.format((datetime.now()-start_time).total_seconds()/3600))
 
@@ -161,8 +158,7 @@ def infer():
     config.gpu_options.allow_growth = True
     config.log_device_placement = False
     with tf.train.MonitoredTrainingSession(config=config) as sess:
-        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
-        saver.restore(sess, checkpoint)
+        saver.restore(sess, args.dirs.checkpoint)
 
         total_cer_dist = 0
         total_cer_len = 0
@@ -176,9 +172,9 @@ def infer():
                              model_infer.list_pl[1]: np.array([len(sample['feature'])])}
                 sample_id, shape_batch, _ = sess.run(model_infer.list_run, feed_dict=dict_feed)
                 # decoded, sample_id, decoded_sparse = sess.run(model_infer.list_run, feed_dict=dict_feed)
-                res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, eos_idx=args.eos_idx, min_idx=0, max_idx=args.dim_output-1)
+                res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, args.token2idx)
                 # align_txt = array2text(alignment[0], args.data.unit, args.idx2token, min_idx=0, max_idx=args.dim_output-1)
-                ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, eos_idx=args.eos_idx, min_idx=0, max_idx=args.dim_output-1)
+                ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, args.token2idx)
 
                 list_res_char = list(res_txt)
                 list_ref_char = list(ref_txt)
@@ -340,13 +336,10 @@ if __name__ == '__main__':
 
     if args.mode == 'infer':
         infer()
-
     elif args.mode == 'infer_lm':
         infer_lm()
-
     elif args.mode == 'save':
         save(gpu=args.gpu, name=args.name)
-
     elif args.mode == 'train':
         train()
 

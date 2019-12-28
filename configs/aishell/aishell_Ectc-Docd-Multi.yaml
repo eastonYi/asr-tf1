@@ -34,7 +34,7 @@ dirs:
     vocab_phone: /mnt/lustre/xushuang2/easton/data/aishell/phone/phones_67+1.vocab
     vocab: /mnt/lustre/xushuang2/easton/data/aishell/char/char_2818.vocab
     # checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_Ectc_Docd_2/120k_ctc/checkpoint/model_G-17799
-    checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_phone2char/2_conv_splice_0_0_DEhalf_1-2/checkpoint/model_G-12999
+    # checkpoint_G: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_phone2char/2_conv_splice_0_0_DEhalf_1-2/checkpoint/model_G-12999
     # checkpoint_G_en: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc2/10k/checkpoint/model-4199
 data:
     featType: mfcc

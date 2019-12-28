@@ -94,27 +94,6 @@ def train():
         if args.dirs.checkpoint_G:
             saver_G.restore(sess, args.dirs.checkpoint_G)
 
-            # cer, wer = dev(
-            #     step=0,
-            #     dataloader=dataloader_dev,
-            #     model=G_infer,
-            #     sess=sess,
-            #     unit=args.data.unit,
-            #     idx2token=args.idx2token,
-            #     eos_idx=args.eos_idx,
-            #     min_idx=0,
-            #     max_idx=args.dim_output-1)
-            # decode_test(
-            #     step=0,
-            #     sample=args.dataset_test[10],
-            #     model=G_infer,
-            #     sess=sess,
-            #     unit=args.data.unit,
-            #     idx2token=args.idx2token,
-            #     eos_idx=None,
-            #     min_idx=0,
-            #     max_idx=None)
-
         batch_time = time()
         num_processed = 0
         num_processed_unbatch = 0
@@ -160,9 +139,7 @@ def train():
                     sess=sess,
                     unit=args.data.unit,
                     idx2token=args.idx2token,
-                    eos_idx=args.eos_idx,
-                    min_idx=0,
-                    max_idx=args.dim_output-1)
+                    token2idx=args.token2idx)
                 # summary.summary_scalar('dev_cer', cer, global_step)
                 # summary.summary_scalar('dev_wer', wer, global_step)
 
@@ -175,9 +152,7 @@ def train():
                     sess=sess,
                     unit=args.data.unit,
                     idx2token=args.idx2token,
-                    eos_idx=None,
-                    min_idx=0,
-                    max_idx=None)
+                    token2idx=args.token2idx)
 
     logging.info('training duration: {:.2f}h'.format((datetime.now()-start_time).total_seconds()/3600))
 
@@ -217,9 +192,9 @@ def infer():
                              model_infer.list_pl[1]: np.array([len(sample['feature'])])}
                 sample_id, shape_batch, _ = sess.run(model_infer.list_run, feed_dict=dict_feed)
                 # decoded, sample_id, decoded_sparse = sess.run(model_infer.list_run, feed_dict=dict_feed)
-                res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, eos_idx=args.eos_idx, min_idx=0, max_idx=args.dim_output-1)
+                res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, args.token2idx)
                 # align_txt = array2text(alignment[0], args.data.unit, args.idx2token, min_idx=0, max_idx=args.dim_output-1)
-                ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, eos_idx=args.eos_idx, min_idx=0, max_idx=args.dim_output-1)
+                ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, args.token2idx)
 
                 list_res_char = list(res_txt)
                 list_ref_char = list(ref_txt)

@@ -50,6 +50,7 @@ args.dir_log = args.dir_exps / 'log'
 args.dir_checkpoint = args.dir_exps / 'checkpoint'
 args.dirs.train.tfdata = Path(args.dirs.train.tfdata) if args.dirs.train.tfdata else None
 args.dirs.dev.tfdata = Path(args.dirs.dev.tfdata) if args.dirs.dev.tfdata else None
+args.dirs.test.tfdata = Path(args.dirs.test.tfdata) if args.dirs.test.tfdata else None
 
 mkdirs(dir_dataInfo)
 mkdirs(dir_exps)
@@ -62,25 +63,13 @@ args.token2idx, args.idx2token = load_vocab(args.dirs.vocab)
 if args.dirs.vocab_phone:
     args.phone2idx, args.idx2phone = load_vocab(args.dirs.vocab_phone)
 args.dim_output = len(args.token2idx)
-if '<eos>' in args.token2idx.keys():
-    args.eos_idx = args.token2idx['<eos>']
-else:
-    args.eos_idx = None
 
-if '<sos>' in args.token2idx.keys():
-    args.sos_idx = args.token2idx['<sos>']
-elif '<blk>' in args.token2idx.keys():
-    args.sos_idx = args.token2idx['<blk>']
-else:
-    args.sos_idx = None
+args.eos_idx = args.token2idx['<eos>']
+args.sos_idx = args.token2idx['<sos>']
 
 args.dirs.train.tfdata = Path(args.dirs.train.tfdata)
 args.dirs.dev.tfdata = Path(args.dirs.dev.tfdata)
-try:
-    mkdirs(args.dirs.train.tfdata)
-    mkdirs(args.dirs.dev.tfdata)
-except:
-    pass
+args.dirs.test.tfdata = Path(args.dirs.test.tfdata)
 args.dirs.train.feat_len = args.dirs.train.tfdata/'feature_length.txt'
 args.dirs.dev.feat_len = args.dirs.dev.tfdata/'feature_length.txt'
 
@@ -103,7 +92,7 @@ if args.dirs.type == 'scp':
         f_trans=args.dirs.test.trans,
         args=args,
         _shuffle=False,
-        transform=True)
+        transform=False)
 elif args.dirs.type == 'scp_multi':
     from .dataset import ASR_phone_char_ArkDataSet
     dataset_train = ASR_phone_char_ArkDataSet(

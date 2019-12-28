@@ -12,7 +12,7 @@ SPACE_INDEX = 0
 FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
 
 
-def unpadding(list_idx, eos_idx=None, min_idx=0, max_idx=None):
+def unpadding(list_idx, token2idx):
     """
     for the 1d array
     Demo:
@@ -20,19 +20,23 @@ def unpadding(list_idx, eos_idx=None, min_idx=0, max_idx=None):
         unpadding(a, 1)
         # array([2, 2, 3, 4, 5])
     """
-    if eos_idx is not None:
-        end_idx = np.where(list_idx==eos_idx)[0]
-        end_idx = end_idx[0] if len(end_idx)>0 else None
-        list_idx = list_idx[:end_idx]
+    eos_idx = token2idx['<eos>']
+    min_idx = token2idx['<eos>']
+    max_idx= token2idx['<blk>']
 
+    # cut the sent at <eos>
+    end_idx = np.where(list_idx==eos_idx)[0]
+    end_idx = end_idx[0] if len(end_idx)>0 else None
+    list_idx = list_idx[:end_idx]
+
+    # remove specical tokens
     list_idx = list_idx[np.where(list_idx>min_idx)]
-    if max_idx is not None:
-        list_idx = list_idx[np.where(list_idx<max_idx)]
+    list_idx = list_idx[np.where(list_idx<max_idx)]
 
     return list_idx
 
 
-def batch_cer(result, reference, eos_idx=None, min_idx=0, max_idx=None):
+def batch_cer(result, reference, token2idx):
     """
     result and reference are lists of tokens
     eos_idx is the padding token or eos token
@@ -40,15 +44,15 @@ def batch_cer(result, reference, eos_idx=None, min_idx=0, max_idx=None):
     batch_dist = 0
     batch_len = 0
     for res, ref in zip(result, reference):
-        res = unpadding(res, eos_idx, min_idx, max_idx)
-        ref = unpadding(ref, eos_idx, min_idx, max_idx)
+        res = unpadding(res, token2idx)
+        ref = unpadding(ref, token2idx)
         batch_dist += ed.eval(res, ref)
         batch_len += len(ref)
 
     return batch_dist, batch_len
 
 
-def batch_wer(result, reference, idx2token, unit, eos_idx=None, min_idx=0, max_idx=None):
+def batch_wer(result, reference, idx2token, token2idx, unit):
     """
     Args:
         result and reference are lists of tokens idx
@@ -61,8 +65,8 @@ def batch_wer(result, reference, idx2token, unit, eos_idx=None, min_idx=0, max_i
     batch_dist = 0
     batch_len = 0
     for res, ref in zip(result, reference):
-        list_res_txt = array2text(res, unit, idx2token, eos_idx, min_idx, max_idx).split()
-        list_ref_txt = array2text(ref, unit, idx2token, eos_idx, min_idx, max_idx).split()
+        list_res_txt = array2text(res, unit, idx2token, token2idx).split()
+        list_ref_txt = array2text(ref, unit, idx2token, token2idx).split()
         # print(' '.join(list_res_txt))
         # print(' '.join(list_ref_txt))
         batch_dist += ed.eval(list_res_txt, list_ref_txt)
@@ -71,12 +75,12 @@ def batch_wer(result, reference, idx2token, unit, eos_idx=None, min_idx=0, max_i
     return batch_dist, batch_len
 
 
-def array2text(res, unit, idx2token, eos_idx=None, min_idx=0, max_idx=None):
+def array2text(res, unit, idx2token, token2idx):
     """
     char: the english characters including blank. The Chinese characters belongs to the word
     for the 1d array
     """
-    res = unpadding(res, eos_idx, min_idx, max_idx)
+    res = unpadding(res, token2idx)
     if unit == 'char':
         list_res_txt = array_idx2char(res, idx2token, seperator='')
     elif unit == 'word':

@@ -1,24 +1,23 @@
 dirs:
     exp: aishell
     train:
-        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-10k.scp
-        trans: /mnt/lustre/xushuang2/easton/data/aishell/char/train-10k.char
-        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-char-10k
-        # scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
-        # trans: /mnt/lustre/xushuang2/easton/data/aishell/char/train-120k.char
-        # tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-char-120k
+        scp: /home/easton/data/AISHELL/feats/feats.dev-14k.scp
+        trans: /home/easton/data/AISHELL/char/dev-14k.char
+        tfdata: /home/easton/data/AISHELL/char/tfdata/dev-char-14k
+        # scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
+        # trans: /home/easton/data/AISHELL/char/train-120k.char
+        # tfdata: /home/easton/data/AISHELL/char/tfdata/train-char-120k
     dev:
-        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.dev-14k.scp
-        trans: /mnt/lustre/xushuang2/easton/data/aishell/char/dev-14k.char
-        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/dev-char-14k
+        scp: /home/easton/data/AISHELL/feats/feats.dev-14k.scp
+        trans: /home/easton/data/AISHELL/char/dev-14k.char
+        tfdata: /home/easton/data/AISHELL/char/tfdata/dev-char-14k_1
     test:
-        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.test-7k.scp
-        trans: /mnt/lustre/xushuang2/easton/data/aishell/char/test-7k.char
-        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/test-char-7k
+        scp: /home/easton/data/AISHELL/feats/feats.test-7k.scp
+        trans: /home/easton/data/AISHELL/char/test-7k.char
+        tfdata: /home/easton/data/AISHELL/char/tfdata/test-char-7k
     type: scp
-    vocab: /mnt/lustre/xushuang2/easton/data/aishell/char/char_2818.vocab
-    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc2/1k/checkpoint/model-599
-    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc2/Ectc_Docd/checkpoint/model-10799
+    vocab: /home/easton/data/AISHELL/char/char.vocab
+    # checkpoint: /home/easton/projects/asr-tf1/exps/aishell/aishell_transformer_char/120k/checkpoint/model-50399
 
 data:
     featType: mfcc
@@ -27,6 +26,7 @@ data:
     downsample: 1
     add_delta: False
     unit: word
+    add_eos: False
 
 model:
     type: ctcModel
@@ -44,7 +44,7 @@ model:
     encoder:
         type: conv_lstm
         num_filters: 64
-        hidden_size: 256
+        hidden_size: 512
     decoder:
         type: FC
         hidden_size: 256
@@ -52,9 +52,9 @@ model:
         label_smoothing: 0.95
 
 optimizer: adam
-warmup_steps: 500
-peak: 0.0003
-decay_steps: 1000
+warmup_steps: 5000
+peak: 0.0005
+decay_steps: 8000
 
 dev_step: 200
 decode_step: 200
@@ -70,7 +70,7 @@ beam_size: 1
 text_batch_size: 200
 max_feat_len: 1230
 max_label_len: 60
-num_batch_tokens: 200000
+num_batch_tokens: 40000
 bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
 
 lambda_lm: 0.0

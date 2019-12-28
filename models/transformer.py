@@ -44,7 +44,6 @@ class Transformer(Seq2SeqModel):
                 encoded, len_encoded = encoder(feature, len_features)
 
             with tf.variable_scope(decoder.name or 'decoder'):
-
                 if labels is None: # infer phrases
                     if self.args.beam_size>1:
                         logging.info('beam search with language model ...')
@@ -60,7 +59,7 @@ class Transformer(Seq2SeqModel):
                     logging.info('teacher-forcing training ...')
                     assert len_labels is not None
                     labels_sos = decoder.build_input(labels)
-                    logits, preds, len_decoded = decoder.decode(
+                    logits, preds, len_decoded = decoder(
                         encoded=encoded,
                         len_encoded=len_encoded,
                         decoder_input=labels_sos)
