@@ -1,12 +1,9 @@
 dirs:
     exp: aishell
     train:
-        scp: /home/easton/data/AISHELL/feats/feats.dev-14k.scp
-        trans: /home/easton/data/AISHELL/char/dev-14k.char
-        tfdata: /home/easton/data/AISHELL/char/tfdata/dev-char-14k
-        # scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
-        # trans: /home/easton/data/AISHELL/char/train-120k.char
-        # tfdata: /home/easton/data/AISHELL/char/tfdata/train-char-120k
+        scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
+        trans: /home/easton/data/AISHELL/char/train-120k.char
+        tfdata: /home/easton/data/AISHELL/char/tfdata/train-char-120k
     dev:
         scp: /home/easton/data/AISHELL/feats/feats.dev-14k.scp
         trans: /home/easton/data/AISHELL/char/dev-14k.char

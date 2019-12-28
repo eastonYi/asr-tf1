@@ -82,7 +82,7 @@ def split_save(dataset, dir_save, size_file=5000000):
         idx_end = min((i+1)*size_file, len(dataset))
         print('saving dataset[{}: {}] to file {}/{}.recode'.format(idx_start, idx_end, dir_save, i))
         writer = tf.io.TFRecordWriter(str(dir_save/'{}.recode'.format(i)))
-        
+
         with open(dir_save/'feature_length.{}.txt'.format(i), 'w') as fw:
             if i == 0:
                 m = tqdm(range(idx_start, idx_end))
@@ -435,11 +435,12 @@ class TFData:
         coord = tf.train.Coordinator()
         assert self.dataset.transform == False
 
-        def gen_recoder(i, writer):
+        def gen_recoder(i):
             num_saved = 0
             num_damaged_sample = 0
             idx_start = i*self.size_file
             idx_end = min((i+1)*self.size_file, len(self.dataset))
+            writer = tf.io.TFRecordWriter(str(self.dir_save/'{}.recode'.format(i)))
             print('saving dataset[{}: {}] to file {}/{}.recode'.format(idx_start, idx_end, self.dir_save, i))
 
             with open(self.dir_save/'feature_length.{}.txt'.format(i), 'w') as fw:
@@ -472,8 +473,7 @@ class TFData:
         workers = len(self.dataset)//self.size_file + 1
         print('save {} samples to {} recoder files'.format(len(self.dataset), workers))
         for i in range(workers):
-            writer = tf.io.TFRecordWriter(str(self.dir_save/'{}.recode'.format(i)))
-            p = Process(target=gen_recoder, args=(i, writer))
+            p = Process(target=gen_recoder, args=(i, ))
             p.start()
             processes.append(p)
         print('generating ...')
