@@ -1,13 +1,9 @@
 dirs:
     exp: aishell
     train:
-        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-10k.scp
-        trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-10k.phone67
-        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-10k_xy_eos
-    # train:
-    #     scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
-    #     trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k.phone67
-    #     tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-120k_xy_eos
+        scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.train-120k.scp
+        trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/train-120k.phone67
+        tfdata: /mnt/lustre/xushuang2/easton/data/aishell/phone/tfdata/train-120k_xy_eos
     dev:
         scp: /mnt/lustre/xushuang2/easton/data/aishell/feats/feats.dev-14k.scp
         trans: /mnt/lustre/xushuang2/easton/data/aishell/phone/dev-14k.phone67

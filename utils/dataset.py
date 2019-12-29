@@ -40,15 +40,7 @@ class ASRDataSet(DataSet):
         self.transform = transform
         self._shuffle = _shuffle
         self.token2idx,self.idx2token = args.token2idx, args.idx2token
-        self.end_id = self.gen_end_id(self.token2idx)
-
-    def gen_end_id(self, token2idx):
-        if '<eos>' in token2idx.keys():
-            eos_id = [token2idx['<eos>']]
-        else:
-            eos_id = []
-
-        return eos_id
+        self.end_id = [args.token2idx['<eos>']] if args.data.add_eos else []
 
     @staticmethod
     def gen_utter_list(file):
@@ -125,8 +117,8 @@ class ASR_scp_DataSet(ASRDataSet):
                 [self.token2idx.get(token, self.token2idx['<unk>'])
                 for token in trans] + self.end_id,
                 dtype=np.int32)
-        except:
-            print('Not found {}!'.format(self.reader.utt_ids[idx]))
+        except KeyError:
+            print('Not found {}!'.format(self.list_uttids[idx]))
             sample = None
 
         return sample
@@ -661,7 +653,7 @@ class PTB_LMDataSet(LMDataSet):
     def __init__(self, list_files, args, _shuffle):
         super().__init__(list_files, args, _shuffle)
         self.start_id = args.token2idx['<sos>']
-        self.end_id = args.token2idx['<eos>']
+        self.end_id = [args.token2idx['<eos>']]
 
     def __iter__(self):
         for filename in self.list_files:
@@ -672,7 +664,7 @@ class PTB_LMDataSet(LMDataSet):
                         continue
                     text_ids = [self.token2idx[word] for word in line]
                     src_ids = [self.start_id] + text_ids
-                    tar_ids = text_ids + [self.end_id]
+                    tar_ids = text_ids + self.end_id
 
                     yield src_ids, tar_ids
 

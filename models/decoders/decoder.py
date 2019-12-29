@@ -46,8 +46,7 @@ class Decoder(object):
         we need to pass the tensors_input in to judge whether there is
         tensors_input.label_splits
         """
-        assert self.start_token, self.end_token
-
+        assert self.start_token
         labels_sos = right_shift_rows(
             p=labels,
             shift=1,

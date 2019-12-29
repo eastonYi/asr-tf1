@@ -11,7 +11,7 @@ import editdistance as ed
 
 from utils.arguments import args
 from models.utils.tools import get_session, create_embedding, size_variables
-from models.utils.tfData import TFReader, readTFRecord
+from models.utils.tfData import TFDataReader
 from utils.dataset import ASRDataLoader
 from utils.summaryTools import Summary
 from utils.performanceTools import dev, decode_test
@@ -20,11 +20,17 @@ from utils.textTools import array_idx2char, array2text
 
 def train():
     print('reading data form ', args.dirs.train.tfdata)
-    dataReader_train = TFReader(args.dirs.train.tfdata, args=args, training=True, transform=True)
-    batch_train = dataReader_train.fentch_batch_bucket()
+    dataReader_train = TFDataReader(args.dirs.train.tfdata, args=args, _shuffle=True, transform=True)
+    dataReader_dev = TFDataReader(args.dirs.dev.tfdata, args=args, _shuffle=False, transform=True)
 
-    feat, label = readTFRecord(args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
-    dataloader_dev = ASRDataLoader(args.dataset_dev, args, feat, label, batch_size=args.batch_size, num_loops=1)
+    batch_train = dataReader_train.fentch_batch_bucket()
+    dataloader_dev = ASRDataLoader(
+        args.dataset_dev,
+        args,
+        dataReader_dev.feat,
+        dataReader_dev.label,
+        batch_size=args.batch_size,
+        num_loops=1)
 
     tensor_global_step = tf.train.get_or_create_global_step()
 
@@ -78,6 +84,7 @@ def train():
     with tf.train.MonitoredTrainingSession(config=config) as sess:
         # for i in range(100):
         #     batch = sess.run(batch_train)
+        #     import pdb; pdb.set_trace()
         #     print(batch[0].shape)
         _, labels, _, len_labels = sess.run(batch_train)
 
@@ -97,7 +104,6 @@ def train():
         while progress < args.num_epochs:
             global_step, lr = sess.run([tensor_global_step, model.learning_rate])
             loss, shape_batch, _, debug = sess.run(model.list_run)
-
             num_processed += shape_batch[0]
             used_time = time()-batch_time
             batch_time = time()
@@ -173,7 +179,6 @@ def infer():
                 sample_id, shape_batch, _ = sess.run(model_infer.list_run, feed_dict=dict_feed)
                 # decoded, sample_id, decoded_sparse = sess.run(model_infer.list_run, feed_dict=dict_feed)
                 res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, args.token2idx)
-                # align_txt = array2text(alignment[0], args.data.unit, args.idx2token, min_idx=0, max_idx=args.dim_output-1)
                 ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, args.token2idx)
 
                 list_res_char = list(res_txt)

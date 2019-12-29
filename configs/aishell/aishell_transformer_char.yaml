@@ -3,30 +3,31 @@ dirs:
     train:
         # scp: /home/easton/data/AISHELL/feats/feats.train-10k.scp
         # trans: /home/easton/data/AISHELL/char/train-10k.char
-        # tfdata: /home/easton/data/AISHELL/phone/tfdata/train-char-10k
+        # tfdata: /home/easton/data/AISHELL/char/tfdata/train-char-10k
         scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
         trans: /home/easton/data/AISHELL/char/train-120k.char
-        tfdata: /home/easton/data/AISHELL/phone/tfdata/train-char-120k_1
+        tfdata: /home/easton/data/AISHELL/char/tfdata/train-char-120k
     dev:
         scp: /home/easton/data/AISHELL/feats/feats.dev-14k.scp
         trans: /home/easton/data/AISHELL/char/dev-14k.char
-        tfdata: /home/easton/data/AISHELL/phone/tfdata/dev-char-14k_1
+        tfdata: /home/easton/data/AISHELL/char/tfdata/dev-char-14k
     test:
         scp: /home/easton/data/AISHELL/feats/feats.test-7k.scp
         trans: /home/easton/data/AISHELL/char/test-7k.char
-        tfdata: /home/easton/data/AISHELL/phone/tfdata/test-char-7k_1
+        tfdata: /home/easton/data/AISHELL/char/tfdata/test-char-7k
         # scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
         # trans: /home/easton/data/AISHELL/char/train-120k.char
-        # tfdata: /home/easton/data/AISHELL/phone/tfdata/train-char-120k
+        # tfdata: /home/easton/data/AISHELL/char/tfdata/train-char-120k
     type: scp
     vocab: /home/easton/data/AISHELL/char/char.vocab
-    # checkpoint: /home/easton/projects/asr-tf1/exps/aishell/aishell_transformer_char/120k/checkpoint/model-50399
+    # checkpoint: /home/easton/projects/asr-tf1/exps/aishell/aishell_transformer_char/checkpoint/model-59099
 
 data:
     featType: mfcc
     left_context: 0
     right_context: 0
     downsample: 1
+    max_feature_len: 3000
     add_delta: False
     unit: word
     add_eos: True
@@ -35,7 +36,7 @@ model:
     type: transformer
     encoder:
         type: transformer_encoder_8x
-        num_blocks: 6
+        num_blocks: 8
         num_heads: 4
         num_cell_units: 512
         attention_dropout_rate: 0.1
@@ -43,7 +44,7 @@ model:
     decoder:
         type: transformer_decoder
         size_embedding: 512
-        num_blocks: 4
+        num_blocks: 6
         num_heads: 4
         num_cell_units: 512
         attention_dropout_rate: 0.1

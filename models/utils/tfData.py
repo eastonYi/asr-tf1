@@ -14,234 +14,8 @@ from utils.tools import mkdirs
 
 
 def _bytes_feature(value):
+    """Returns a bytes_list from a list of string / byte."""
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
-
-
-def save2tfrecord(dataset, dir_save, size_file=5000000):
-    """
-    Args:
-        dataset = ASRdataSet(data_file, args)
-        dir_save: the dir to save the tfdata files
-    Return:
-        Nothing but a folder consist of `tfdata.info`, `*.recode`
-
-    Notice: the feats.scp file is better to cluster by ark file and sort by the index in the ark files
-    For example, '...split16/1/final_feats.ark:143468' the paths share the same arkfile '1/final_feats.ark' need to close with each other,
-    Meanwhile, these files need to be sorted by the index ':143468'
-    ther sorted scp file will be 10x faster than the unsorted one.
-    """
-
-    num_token = 0
-    idx_file = -1
-    num_damaged_sample = 0
-    mkdirs(dir_save)
-
-    assert dataset.transform == False
-    with open(dir_save/'feature_length.txt', 'w') as fw:
-        for i, sample in enumerate(tqdm(dataset)):
-            if not sample:
-                num_damaged_sample += 1
-                continue
-            dim_feature = sample['feature'].shape[-1]
-            if (num_token // size_file) > idx_file:
-                idx_file = num_token // size_file
-                print('saving to file {}/{}.recode'.format(dir_save, idx_file))
-                writer = tf.io.TFRecordWriter(str(dir_save/'{}.recode'.format(idx_file)))
-
-            example = tf.train.Example(
-                features=tf.train.Features(
-                    feature={'feature': _bytes_feature(sample['feature'].tostring()),
-                             'label': _bytes_feature(sample['label'].tostring())}
-                )
-            )
-            writer.write(example.SerializeToString())
-            num_token += len(sample['feature'])
-            line = sample['uttid'] + ' ' + str(len(sample['feature']))
-            fw.write(line + '\n')
-
-    with open(dir_save/'tfdata.info', 'w') as fw:
-        # print('data_file {}'.format(dataset.list_files), file=fw)
-        print('dim_feature {}'.format(dim_feature), file=fw)
-        print('num_tokens {}'.format(num_token), file=fw)
-        print('size_dataset {}'.format(i-num_damaged_sample), file=fw)
-        print('damaged samples: {}'.format(num_damaged_sample), file=fw)
-
-    return
-
-
-def split_save(dataset, dir_save, size_file=5000000):
-    mkdirs(dir_save)
-    output = Queue()
-    coord = tf.train.Coordinator()
-    assert dataset.transform == False
-
-    def gen_recoder(i):
-        num_saved = 0
-        num_damaged_sample = 0
-        idx_start = i*size_file
-        idx_end = min((i+1)*size_file, len(dataset))
-        print('saving dataset[{}: {}] to file {}/{}.recode'.format(idx_start, idx_end, dir_save, i))
-        writer = tf.io.TFRecordWriter(str(dir_save/'{}.recode'.format(i)))
-
-        with open(dir_save/'feature_length.{}.txt'.format(i), 'w') as fw:
-            if i == 0:
-                m = tqdm(range(idx_start, idx_end))
-            else:
-                m = range(idx_start, idx_end)
-            for j in m:
-                sample = dataset[j]
-                if not sample:
-                    num_damaged_sample += 1
-                    continue
-
-                example = tf.train.Example(
-                    features=tf.train.Features(
-                        feature={'feature': _bytes_feature(sample['feature'].tostring()),
-                                 'label': _bytes_feature(sample['label'].tostring())}
-                    )
-                )
-                writer.write(example.SerializeToString())
-                line = sample['uttid'] + ' ' + str(len(sample['feature']))
-                fw.write(line + '\n')
-                num_saved += 1
-                # if num_saved % 2000 == 0:
-                #     print('saved {} samples in {}.recode'.format(num_saved, i))
-        print('{}.recoder finished, {} saved, {} damaged. '.format(i, num_saved, num_damaged_sample))
-        output.put((i, num_damaged_sample, num_saved))
-
-    processes = []
-    workers = len(dataset)//size_file + 1
-    print('save {} samples to {} recoder files'.format(len(dataset), workers))
-    for i in range(workers):
-        p = Process(target=gen_recoder, args=(i,))
-        p.start()
-        processes.append(p)
-    print('generating ...')
-    coord.join(processes)
-    print('save recode files finished.')
-
-    res = [output.get() for _ in processes]
-    num_saved = sum([x[2] for x in res])
-    num_damaged = sum([x[1] for x in res])
-    # TODO: concat feature length file
-    with open(str(dir_save/'tfdata.info'), 'w') as fw:
-        fw.write('data_file {}\n'.format(dataset.file))
-        fw.write('dim_feature {}\n'.format(dataset[0]['feature'].shape[-1]))
-        fw.write('size_dataset {}\n'.format(num_saved))
-        fw.write('damaged samples: {}\n'.format(num_damaged))
-
-    os.system('cat {}/feature_length.*.txt > {}/feature_length.txt'.format(dir_save, dir_save))
-
-    print('ALL FINISHED.')
-
-
-def readTFRecord(dir_data, args, _shuffle=False, num_epochs=None, transform=False):
-    """
-    the tensor could run unlimitatly
-    """
-    list_filenames = fentch_filelist(dir_data)
-    if _shuffle:
-        shuffle(list_filenames)
-    else:
-        list_filenames.sort()
-
-    filename_queue = tf.train.string_input_producer(
-        list_filenames, num_epochs=num_epochs, shuffle=shuffle)
-
-    reader_tfRecord = tf.TFRecordReader()
-    _, serialized_example = reader_tfRecord.read(filename_queue)
-    # _, serialized_example = reader_tfRecord.read(filename_queue)
-    features = tf.parse_single_example(
-        serialized_example,
-        features={'feature': tf.FixedLenFeature([], tf.string),
-                  # 'id': tf.FixedLenFeature([], tf.string)}
-                  'label': tf.FixedLenFeature([], tf.string)}
-    )
-
-    feature = tf.reshape(tf.decode_raw(features['feature'], tf.float32),
-                         [-1, args.data.dim_feature])[:3000, :]
-    # id = tf.decode_raw(features['id'], tf.string)
-    label = tf.decode_raw(features['label'], tf.int32)
-    if transform:
-        feature = process_raw_feature(feature, args)
-    if args.data.add_eos:
-        label = tf.concat([label, [args.eos_idx]], 0)
-
-    return feature, label
-
-
-def save2tfrecord_multilabel(dataset, dir_save, size_file=5000000):
-
-    num_token = 0
-    idx_file = -1
-    num_damaged_sample = 0
-
-    assert dataset.transform == False
-    with open(dir_save/'feature_length.txt', 'w') as fw:
-        for i, sample in enumerate(tqdm(dataset)):
-            if not sample:
-                num_damaged_sample += 1
-                continue
-            dim_feature = sample['feature'].shape[-1]
-            if (num_token // size_file) > idx_file:
-                idx_file = num_token // size_file
-                print('saving to file {}/{}.recode'.format(dir_save, idx_file))
-                writer = tf.io.TFRecordWriter(str(dir_save/'{}.recode'.format(idx_file)))
-
-            example = tf.train.Example(
-                features=tf.train.Features(
-                    feature={'feature': _bytes_feature(sample['feature'].tostring()),
-                             'phone': _bytes_feature(sample['phone'].tostring()),
-                             'label': _bytes_feature(sample['label'].tostring())}
-                )
-            )
-            writer.write(example.SerializeToString())
-            num_token += len(sample['feature'])
-            line = sample['uttid'] + ' ' + str(len(sample['feature']))
-            fw.write(line + '\n')
-
-    with open(dir_save/'tfdata.info', 'w') as fw:
-        # print('data_file {}'.format(dataset.list_files), file=fw)
-        print('dim_feature {}'.format(dim_feature), file=fw)
-        print('num_tokens {}'.format(num_token), file=fw)
-        print('size_dataset {}'.format(i-num_damaged_sample), file=fw)
-        print('damaged samples: {}'.format(num_damaged_sample), file=fw)
-
-    return
-
-
-def readTFRecord_multilabel(dir_data, args, _shuffle=False, num_epochs=None, transform=False):
-    """
-    use for multi-label
-    """
-    list_filenames = fentch_filelist(dir_data)
-    if _shuffle:
-        shuffle(list_filenames)
-    else:
-        list_filenames.sort()
-
-    filename_queue = tf.train.string_input_producer(
-        list_filenames, num_epochs=num_epochs, shuffle=shuffle)
-
-    reader_tfRecord = tf.TFRecordReader()
-    _, serialized_example = reader_tfRecord.read(filename_queue)
-    features = tf.parse_single_example(
-        serialized_example,
-        features={'feature': tf.FixedLenFeature([], tf.string),
-                  'phone': tf.FixedLenFeature([], tf.string),
-                  'label': tf.FixedLenFeature([], tf.string)
-                  }
-    )
-
-    feature = tf.reshape(tf.decode_raw(features['feature'], tf.float32),
-        [-1, args.data.dim_feature])[:2000, :]
-    phone = tf.decode_raw(features['phone'], tf.int32)
-    label = tf.decode_raw(features['label'], tf.int32)
-
-    if transform:
-        feature = process_raw_feature(feature, args)
-
-    return feature, phone, label
 
 
 def process_raw_feature(seq_raw_features, args):
@@ -265,33 +39,31 @@ def process_raw_feature(seq_raw_features, args):
     return fea
 
 
-def fentch_filelist(dir_data):
+def fentch_filelist(dir_data, _shuffle=False):
     p = Path(dir_data)
     assert p.is_dir()
 
-    return [str(i) for i in p.glob('*.recode')]
+    list_filenames = [str(i) for i in p.glob('*.recode')]
+
+    if _shuffle:
+        shuffle(list_filenames)
+    else:
+        list_filenames.sort()
+
+    return list_filenames
 
 
-class TFReader:
-    def __init__(self, dir_tfdata, args, training=True, num_epochs=None, transform=True):
-        self.training = training
+class TFDataReader:
+    def __init__(self, dir_tfdata, args, _shuffle=False, num_epochs=None, transform=True):
+        self.dir_data = dir_tfdata
+        self._shuffle = _shuffle
         self.args = args
         self.sess = None
+        self.read_multilabel = args.dirs.vocab_phone
+        self.max_feature_len = self.args.data.max_feature_len
         self.list_batch_size = self.args.list_batch_size
         self.list_bucket_boundaries = self.args.list_bucket_boundaries
-        if args.dirs.vocab_phone:
-            self.feat, self.phone, self.label = readTFRecord_multilabel(
-                dir_tfdata,
-                args,
-                _shuffle=training,
-                transform=transform)
-        else:
-            self.feat, self.label = readTFRecord(
-                dir_tfdata,
-                args,
-                _shuffle=training,
-                num_epochs=num_epochs,
-                transform=transform)
+        self.readTFRecord(_shuffle=_shuffle, num_epochs=num_epochs, transform=transform)
 
     def __iter__(self):
         """It is only a demo! Using `fentch_batch_with_TFbuckets` in practice."""
@@ -300,6 +72,56 @@ class TFReader:
 
         for i in range(len(self.args.data.size_dev)):
             yield self.sess.run([self.feat, self.label])
+
+    @staticmethod
+    def read_tfdata_info(dir_save):
+        data_info = {}
+        with open(dir_save/'tfdata.info') as f:
+            for line in f:
+                if 'dim_feature' in line or \
+                    'num_tokens' in line or \
+                    'size_dataset' in line:
+                    line = line.strip().split(' ')
+                    data_info[line[0]] = int(line[1])
+
+        return data_info
+
+    def readTFRecord(self, _shuffle=False, num_epochs=None, transform=False):
+
+        list_filenames = fentch_filelist(self.dir_data, _shuffle)
+
+        filename_queue = tf.train.string_input_producer(
+            list_filenames, num_epochs=num_epochs, shuffle=shuffle)
+
+        reader_tfRecord = tf.TFRecordReader()
+        _, serialized_example = reader_tfRecord.read(filename_queue)
+
+        if self.read_multilabel:
+            features = tf.parse_single_example(
+                serialized_example,
+                features={'feature': tf.FixedLenFeature([], tf.string),
+                          'phone': tf.FixedLenFeature([], tf.string),
+                          'label': tf.FixedLenFeature([], tf.string)})
+        else:
+            features = tf.parse_single_example(
+                serialized_example,
+                features={'feature': tf.FixedLenFeature([], tf.string),
+                          'label': tf.FixedLenFeature([], tf.string)})
+
+        feature = tf.reshape(tf.decode_raw(features['feature'], tf.float32),
+                             [-1, self.args.data.dim_feature])[:self.max_feature_len, :]
+        label = tf.decode_raw(features['label'], tf.int32)
+
+        if transform:
+            feature = process_raw_feature(feature, self.args)
+        if self.args.data.add_eos:
+            label = tf.concat([label, [self.args.eos_idx]], 0)
+
+        self.feat = feature
+        self.label = label
+        if self.read_multilabel:
+            phone = tf.decode_raw(features['phone'], tf.int32)
+            self.phone = phone
 
     def fentch_batch(self, batch_size):
         list_inputs = [self.feat, self.label, tf.shape(self.feat)[0], tf.shape(self.label)[0]]
@@ -379,7 +201,7 @@ class TFReader:
                 seq_len_feats, seq_len_phone, seq_len_label
 
 
-class TFData:
+class TFDataSaver:
     """
     test on TF2.0-alpha
     """
@@ -389,9 +211,10 @@ class TFData:
         self.dir_save = dir_save
         mkdirs(self.dir_save)
         self.args = args
+        self.save_multilabel = args.dirs.vocab_phone
+        self.add_eos = args.data.add_eos
         self.size_file = size_file
-        self.dim_feature = dataset[0]['feature'].shape[-1] \
-            if dataset else self.read_tfdata_info(dir_save)['dim_feature']
+        self.dim_feature = dataset[0]['feature'].shape[-1]
 
     def save(self):
         num_token = 0
@@ -454,12 +277,18 @@ class TFData:
                         num_damaged_sample += 1
                         continue
 
-                    example = tf.train.Example(
-                        features=tf.train.Features(
-                            feature={'feature': _bytes_feature(sample['feature'].tostring()),
-                                     'label': _bytes_feature(sample['label'].tostring())}
-                        )
-                    )
+                    if self.save_multilabel:
+                        example = tf.train.Example(
+                            features=tf.train.Features(
+                                feature={'feature': _bytes_feature(sample['feature'].tostring()),
+                                         'phone': _bytes_feature(sample['phone'].tostring()),
+                                         'label': _bytes_feature(sample['label'].tostring())}))
+                    else:
+                        example = tf.train.Example(
+                            features=tf.train.Features(
+                                feature={'feature': _bytes_feature(sample['feature'].tostring()),
+                                         'label': _bytes_feature(sample['label'].tostring())}))
+
                     writer.write(example.SerializeToString())
                     line = sample['uttid'] + ' ' + str(len(sample['feature']))
                     fw.write(line + '\n')
@@ -493,64 +322,6 @@ class TFData:
         os.system('cat {}/feature_length.*.txt > {}/feature_length.txt'.format(self.dir_save, self.dir_save))
 
         print('ALL FINISHED.')
-
-    def read(self, _shuffle=False):
-        """
-        the tensor could run unlimitatly
-        """
-        list_filenames = self.fentch_filelist(self.dir_save)
-        if _shuffle:
-            shuffle(list_filenames)
-        else:
-            list_filenames.sort()
-
-        raw_dataset = tf.data.TFRecordDataset(list_filenames)
-
-        def _parse_function(example_proto):
-            features = tf.io.parse_single_example(
-                example_proto,
-                features={
-                    'feature': tf.io.FixedLenFeature([], tf.string),
-                    'label': tf.io.FixedLenFeature([], tf.string)
-                }
-            )
-            feature = tf.reshape(tf.io.decode_raw(features['feature'], tf.float32),
-                                 [-1, self.dim_feature])[:self.max_feat_len, :]
-            label = tf.io.decode_raw(features['label'], tf.int32)
-
-            return feature, label
-
-        features = raw_dataset.map(_parse_function)
-
-        return features
-
-    def __len__(self):
-        return self.read_tfdata_info(self.dir_save)['size_dataset']
-
-    @staticmethod
-    def fentch_filelist(dir_data):
-        p = Path(dir_data)
-        assert p.is_dir()
-
-        return [str(i) for i in p.glob('*.recode')]
-
-    @staticmethod
-    def _bytes_feature(value):
-        """Returns a bytes_list from a list of string / byte."""
-        return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
-
-    @staticmethod
-    def read_tfdata_info(dir_save):
-        data_info = {}
-        with open(dir_save/'tfdata.info') as f:
-            for line in f:
-                if 'dim_feature' in line or \
-                    'num_tokens' in line or \
-                    'size_dataset' in line:
-                    line = line.strip().split(' ')
-                    data_info[line[0]] = int(line[1])
-
-        return data_info
 
 
 if __name__ == '__main__':

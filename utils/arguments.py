@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 logging.basicConfig(level=logging.INFO, stream=sys.stdout, format='%(levelname)s(%(filename)s:%(lineno)d): %(message)s')
 
 from .dataProcess import load_vocab
-from models.utils.tfData import TFData
+from models.utils.tfData import TFDataReader
 from .tools import mkdirs, AttrDict
 
 parser = ArgumentParser()
@@ -159,9 +159,9 @@ args.dataset_train = dataset_train
 args.dataset_test = dataset_test
 
 try:
-    args.data.dim_feature = TFData.read_tfdata_info(args.dirs.train.tfdata)['dim_feature']
-    args.data.train_size = TFData.read_tfdata_info(args.dirs.train.tfdata)['size_dataset']
-    args.data.dev_size = TFData.read_tfdata_info(args.dirs.dev.tfdata)['size_dataset']
+    args.data.dim_feature = TFDataReader.read_tfdata_info(args.dirs.train.tfdata)['dim_feature']
+    args.data.train_size = TFDataReader.read_tfdata_info(args.dirs.train.tfdata)['size_dataset']
+    args.data.dev_size = TFDataReader.read_tfdata_info(args.dirs.dev.tfdata)['size_dataset']
     args.data.dim_input = args.data.dim_feature * \
             (args.data.right_context + args.data.left_context +1) *\
             (3 if args.data.add_delta else 1)

@@ -1,13 +1,13 @@
 dirs:
     exp: aishell
     train:
-        scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
-        trans: /home/easton/data/AISHELL/char/train-120k.char
-        tfdata: /home/easton/data/AISHELL/char/tfdata/train-char-120k
+        scp: /home/easton/data/AISHELL/feats/feats.train-10k.scp
+        trans: /home/easton/data/AISHELL/char/train-10k.char
+        tfdata: /home/easton/data/AISHELL/char/tfdata/train-char-10k
     dev:
         scp: /home/easton/data/AISHELL/feats/feats.dev-14k.scp
         trans: /home/easton/data/AISHELL/char/dev-14k.char
-        tfdata: /home/easton/data/AISHELL/char/tfdata/dev-char-14k_1
+        tfdata: /home/easton/data/AISHELL/char/tfdata/dev-char-14k
     test:
         scp: /home/easton/data/AISHELL/feats/feats.test-7k.scp
         trans: /home/easton/data/AISHELL/char/test-7k.char
@@ -41,7 +41,7 @@ model:
     encoder:
         type: conv_lstm
         num_filters: 64
-        hidden_size: 512
+        hidden_size: 1200
     decoder:
         type: FC
         hidden_size: 256
