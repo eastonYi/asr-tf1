@@ -4,31 +4,28 @@ from time import time
 import os
 import sys
 import logging
-import tensorflow as tf
 from pathlib import Path
-from tqdm import tqdm
+import tensorflow as tf
 import numpy as np
 import editdistance as ed
 
-from models.utils.tools import get_session, create_embedding, size_variables
-from models.utils.tfData import TFReader, readTFRecord, TFData
+from models.utils.tools import get_session, size_variables
+from models.utils.tfData import TFDataReader
 from utils.arguments import args
 from utils.dataset import ASRDataLoader, TextDataSet
 from utils.summaryTools import Summary
-# from utils.performanceTools import dev, decode_test
-from utils.textTools import array_idx2char, array2text, batch_wer, batch_cer
+from utils.textTools import array2text, batch_wer, batch_cer
 from utils.tools import get_batch_length
 
 
 def train():
     print('reading data form ', args.dirs.train.tfdata)
-    dataReader_train = TFReader(args.dirs.train.tfdata, args=args)
+    dataReader_train = TFDataReader(args.dirs.train.tfdata, args=args)
     batch_train = dataReader_train.fentch_batch_bucket()
-    dataReader_untrain = TFReader(args.dirs.untrain.tfdata, args=args)
+    dataReader_untrain = TFDataReader(args.dirs.untrain.tfdata, args=args)
     batch_untrain = dataReader_untrain.fentch_batch(args.batch_size)
-    # batch_untrain = dataReader_untrain.fentch_batch_bucket()
     args.dirs.untrain.tfdata = Path(args.dirs.untrain.tfdata)
-    args.data.untrain_size = TFData.read_tfdata_info(args.dirs.untrain.tfdata)['size_dataset']
+    args.data.untrain_size = TFDataReader.read_tfdata_info(args.dirs.untrain.tfdata)['size_dataset']
 
     dataset_text = TextDataSet(list_files=[args.dirs.text.data], args=args, _shuffle=True)
     tfdata_train = tf.data.Dataset.from_generator(
@@ -37,10 +34,14 @@ def train():
         padded_batch(args.text_batch_size, ([args.max_label_len])).prefetch(buffer_size=5).\
         make_one_shot_iterator().get_next()
 
-    feat, label = readTFRecord(args.dirs.dev.tfdata, args,
-                               _shuffle=False, transform=True)
-    dataloader_dev = ASRDataLoader(args.dataset_dev, args, feat, label,
-                                   batch_size=args.batch_size, num_loops=1)
+    dataReader_dev = TFDataReader(args.dirs.dev.tfdata, args=args, _shuffle=False, transform=True)
+    dataloader_dev = ASRDataLoader(
+        args.dataset_dev,
+        args,
+        dataReader_dev.feat,
+        dataReader_dev.label,
+        batch_size=args.batch_size,
+        num_loops=1)
 
     tensor_global_step = tf.train.get_or_create_global_step()
     tensor_global_step0 = tf.Variable(0, dtype=tf.int32, trainable=False)
@@ -92,13 +93,6 @@ def train():
             saver_G.restore(sess, args.dirs.checkpoint_G)
         if args.dirs.checkpoint_G_en:
             saver_G_en.restore(sess, args.dirs.checkpoint_G_en)
-
-        # for i in range(500):
-        #     ctc_loss, *_ = sess.run(G.list_run)
-        #     if i % 100 == 0:
-        #         print('i: {} ctc_loss: {:.2f}'.format(i, ctc_loss))
-        # saver_G_en.save(get_session(sess), str(args.dir_checkpoint/'model_G_en'), global_step=0, write_meta_graph=True)
-        # print('saved model in',  str(args.dir_checkpoint)+'/model_G_en-0')
 
         batch_time = time()
         num_processed = 0
@@ -157,26 +151,25 @@ def train():
 
             if global_step % args.dev_step == args.dev_step - 1:
             # if global_step % args.dev_step == 0:
-                cer, wer = dev(
+                _cer, cer, wer = dev(
                     step=global_step,
                     dataloader=dataloader_dev,
                     model=G_infer,
                     sess=sess,
                     unit=args.data.unit,
-                    idx2token=args.idx2token,
-                    token2idx=args.token2idx)
+                    args=args)
+                # summary.summary_scalar('dev_cer', _cer, global_step)
                 summary.summary_scalar('dev_cer', cer, global_step)
                 summary.summary_scalar('dev_wer', wer, global_step)
 
             if global_step % args.decode_step == args.decode_step - 1:
                 decode_test(
                     step=global_step,
-                    sample=args.dataset_test[10],
+                    sample=args.dataset_test.uttid2sample(args.sample_uttid),
                     model=G_infer,
                     sess=sess,
                     unit=args.data.unit,
-                    idx2token=args.idx2token,
-                    token2idx=args.token2idx)
+                    args=args)
 
     logging.info('training duration: {:.2f}h'.format((datetime.now()-start_time).total_seconds()/3600))
 
@@ -244,13 +237,14 @@ def infer():
         logging.info('dev CER {:.3f}:  WER: {:.3f}'.format(total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
 
 
-def dev(step, dataloader, model, sess, unit, idx2token, token2idx):
+def dev(step, dataloader, model, sess, unit, args):
     start_time = time()
     batch_time = time()
     processed = 0
 
     total_cer_ctc_dist = 0
     total_cer_dist = 0
+    total_cer_ctc_len = 0
     total_cer_len = 0
 
     total_wer_ctc_dist = 0
@@ -264,31 +258,32 @@ def dev(step, dataloader, model, sess, unit, idx2token, token2idx):
         (decoded_ctc, decoded), shape_batch, _ = sess.run(model.list_run, feed_dict=dict_feed)
         # import pdb; pdb.set_trace()
 
-        batch_cer_ctc_dist, batch_cer_len = batch_cer(
+        batch_cer_ctc_dist, batch_cer_ctc_len = batch_cer(
             result=decoded_ctc,
             reference=batch[1],
-            token2idx=token2idx)
+            token2idx=args.token2idx)
         batch_cer_dist, batch_cer_len = batch_cer(
             result=decoded,
             reference=batch[1],
-            token2idx=token2idx)
-        _cer_ctc = batch_cer_ctc_dist/batch_cer_len
+            token2idx=args.token2idx)
+        _cer_ctc = batch_cer_ctc_dist/batch_cer_ctc_len
         _cer = batch_cer_dist/batch_cer_len
         total_cer_ctc_dist += batch_cer_ctc_dist
         total_cer_dist += batch_cer_dist
+        total_cer_ctc_len += batch_cer_ctc_len
         total_cer_len += batch_cer_len
 
         batch_wer_ctc_dist, batch_wer_len = batch_wer(
             result=decoded_ctc,
             reference=batch[1],
-            idx2token=idx2token,
-            token2idx=token2idx,
+            idx2token=args.idx2token,
+            token2idx=args.token2idx,
             unit=unit)
         batch_wer_dist, batch_wer_len = batch_wer(
             result=decoded,
             reference=batch[1],
-            idx2token=idx2token,
-            token2idx=token2idx,
+            idx2token=args.idx2token,
+            token2idx=args.token2idx,
             unit=unit)
         _wer_ctc = batch_wer_ctc_dist/batch_wer_len
         _wer = batch_wer_dist/batch_wer_len
@@ -300,30 +295,29 @@ def dev(step, dataloader, model, sess, unit, idx2token, token2idx):
         batch_time = time()
         processed += shape_batch[0]
         progress = processed/len(dataloader)
-        sys.stdout.write('\rbatch CTC cer: {:.3f}\twer: {:.3f} \tbatch cer: {:.3f}\twer: {:.3f} batch: {}\t time:{:.2f}s {:.3f}%'.format(
-                      _cer_ctc, _wer_ctc, _cer, _wer, shape_batch, used_time, progress*100.0))
+        sys.stdout.write('\rbatch CTC per: {:.3f} \tbatch cer: {:.3f}\twer: {:.3f} batch: {}\t time:{:.2f}s {:.3f}%'.format(
+                      _cer_ctc, _cer, _wer, shape_batch, used_time, progress*100.0))
         sys.stdout.flush()
 
     used_time = time() - start_time
-    cer_ctc = total_cer_ctc_dist/total_cer_len
-    wer_ctc = total_wer_ctc_dist/total_wer_len
+    per = total_cer_ctc_dist/total_cer_ctc_len
     cer = total_cer_dist/total_cer_len
     wer = total_wer_dist/total_wer_len
     logging.warning('\n=====dev info, total used time {:.2f}h==== \nCTC WER: {:.4f}\tWER: {:.4f}\ntotal_wer_len: {}'.format(
-                 used_time/3600, wer_ctc, wer, total_wer_len))
+                 used_time/3600, per, wer, total_wer_len))
 
-    return cer, wer
+    return per, cer, wer
 
 
-def decode_test(step, sample, model, sess, unit, idx2token, token2idx):
+def decode_test(step, sample, model, sess, unit, args):
     # sample = dataset_dev[0]
     dict_feed = {model.list_pl[0]: np.expand_dims(sample['feature'], axis=0),
                  model.list_pl[1]: np.array([len(sample['feature'])])}
     (decoded_ctc, decoded), shape_sample, _ = sess.run(model.list_run, feed_dict=dict_feed)
 
-    res_ctc_txt = array2text(decoded_ctc[0], unit, idx2token, token2idx)
-    res_txt = array2text(decoded[0], unit, idx2token, token2idx)
-    ref_txt = array2text(sample['label'], unit, idx2token, token2idx)
+    res_ctc_txt = array2text(decoded_ctc[0], unit, args.idx2token, args.token2idx)
+    res_txt = array2text(decoded[0], unit, args.idx2token, args.token2idx)
+    ref_txt = array2text(sample['label'], unit, args.idx2token, args.token2idx)
 
     logging.warning('length: {}, \nres_ctc: \n{}\nres: \n{}\nref: \n{}'.format(
         shape_sample[1], res_ctc_txt, res_txt, ref_txt))

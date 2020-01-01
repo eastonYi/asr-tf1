@@ -92,7 +92,7 @@ if args.dirs.type == 'scp':
         f_trans=args.dirs.test.trans,
         args=args,
         _shuffle=False,
-        transform=False)
+        transform=True)
 elif args.dirs.type == 'scp_multi':
     from .dataset import ASR_phone_char_ArkDataSet
     dataset_train = ASR_phone_char_ArkDataSet(

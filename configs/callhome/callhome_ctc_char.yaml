@@ -28,16 +28,6 @@ data:
 model:
     type: ctcModel
     confidence_penalty: 0.2
-    # encoder:
-    #     # type: conv2
-    #     type: conv_lstm
-    #     num_filters: 256
-    #     num_blocks: 2
-    # decoder:
-    #     type: FC
-    #     hidden_size: 256
-    #     num_fc: 2
-    #     label_smoothing: 0.95
     encoder:
         type: conv_lstm
         num_filters: 64

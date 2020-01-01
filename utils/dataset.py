@@ -117,6 +117,7 @@ class ASR_scp_DataSet(ASRDataSet):
                 [self.token2idx.get(token, self.token2idx['<unk>'])
                 for token in trans] + self.end_id,
                 dtype=np.int32)
+            import pdb; pdb.set_trace()
         except KeyError:
             print('Not found {}!'.format(self.list_uttids[idx]))
             sample = None
@@ -125,6 +126,10 @@ class ASR_scp_DataSet(ASRDataSet):
 
     def __len__(self):
         return len(self.list_uttids)
+
+    def uttid2sample(self, uttid):
+        id = self.list_uttids.index(uttid)
+        return self[id]
 
     def load_trans(self, f_trans):
         dict_trans = {}

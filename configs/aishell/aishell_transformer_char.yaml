@@ -24,9 +24,9 @@ dirs:
 
 data:
     featType: mfcc
-    left_context: 0
+    left_context: 2
     right_context: 0
-    downsample: 1
+    downsample: 3
     max_feature_len: 3000
     add_delta: False
     unit: word
@@ -35,8 +35,8 @@ data:
 model:
     type: transformer
     encoder:
-        type: transformer_encoder_8x
-        num_blocks: 8
+        type: transformer_encoder
+        num_blocks: 6
         num_heads: 4
         num_cell_units: 512
         attention_dropout_rate: 0.1
@@ -61,7 +61,7 @@ model_D:
 optimizer: adam
 # lr: 0.00001
 warmup_steps: 8000
-peak: 0.0008
+peak: 0.0004
 decay_steps: 12000
 # warmup_steps: 600
 # peak: 0.0002
@@ -81,8 +81,8 @@ beam_size: 1
 text_batch_size: 24
 max_feat_len: 550
 max_label_len: 60
-num_batch_tokens: 26000
-bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
+num_batch_tokens: 22000
+bucket_boundaries: 102,114,124,134,144,155,166,179,192,209,235,301,410
 
 lambda_lm: 0.0
 lambda_l2: 0.0
