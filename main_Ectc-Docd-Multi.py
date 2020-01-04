@@ -81,6 +81,7 @@ def train():
     saver_G_en = tf.train.Saver(vars_G_en + vars_G_ctc, max_to_keep=10)
     saver = tf.train.Saver(max_to_keep=15)
     summary = Summary(str(args.dir_log))
+    step_bias = 0
 
     config = tf.ConfigProto()
     config.allow_soft_placement = True
@@ -90,6 +91,7 @@ def train():
         dataloader_dev.sess = sess
         if args.dirs.checkpoint_G:
             saver_G.restore(sess, args.dirs.checkpoint_G)
+            step_bias = int(args.dirs.checkpoint_G.split('-')[-1])
         if args.dirs.checkpoint_G_en:
             saver_G_en.restore(sess, args.dirs.checkpoint_G_en)
 
@@ -101,6 +103,7 @@ def train():
 
             # supervised training
             global_step, lr = sess.run([tensor_global_step, G.learning_rate])
+            global_step += step_bias
             loss_G, shape_batch, _, (ctc_loss, ce_loss, *_) = sess.run(G.list_run)
             num_processed += shape_batch[0]
             used_time = time()-batch_time

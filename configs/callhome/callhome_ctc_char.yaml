@@ -1,7 +1,10 @@
 dirs:
     exp: callhome
     train:
-        scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.scp
+        # scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.scp
+        # trans: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.char
+        # tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train_char
+        scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train
         trans: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.char
         tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train_char
     dev:

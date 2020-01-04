@@ -7,7 +7,7 @@ from utils.tools import get_bucket
 
 
 def main():
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     assert args.data.add_eos == False
     # confirm = input("You are going to generate new tfdata, may covering the existing one.\n press ENTER to continue. ")
     # if confirm == "":
@@ -20,7 +20,7 @@ def main():
     # TFDataSaver(args.dataset_dev, args.dirs.dev.tfdata, args, size_file=10000, max_feat_len=3000).split_save()
     # print(args.data.dim_feature)
     # feat, label = readTFRecord(args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
-    # get_bucket(args.dirs.train.tfdata / 'feature_length.txt', args.num_batch_tokens, 60)
+    get_bucket(args.dirs.train.tfdata / 'feature_length.txt', args.num_batch_tokens, 120)
 
 if __name__ == '__main__':
     import os

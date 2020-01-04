@@ -148,3 +148,70 @@ class CONV_LSTM(Encoder):
         x = tf.squeeze(x, axis=2)
 
         return x, len_sequence
+
+
+class CONV_LSTM_4x(CONV_LSTM):
+    '''VERY DEEP CONVOLUTIONAL NETWORKS FOR END-TO-END SPEECH RECOGNITION
+    '''
+
+    def encode(self, features, len_features):
+
+        hidden_size = self.args.model.encoder.hidden_size
+        num_filters = self.args.model.encoder.num_filters
+        dropout = self.args.model.dropout
+        use_residual = False
+        size_feat = self.args.data.dim_input
+
+        # x = tf.expand_dims(features, -1)
+        size_batch  = tf.shape(features)[0]
+        size_length = tf.shape(features)[1]
+        # size_feat = int(size_feat/3)
+        len_feats = tf.reduce_sum(tf.cast(tf.reduce_sum(tf.abs(features), -1) > 0, tf.int32), -1)
+        # x = tf.reshape(features, [size_batch, size_length, size_feat, 3])
+        x = tf.reshape(features, [size_batch, size_length, size_feat, 1])
+        # the first cnn layer
+        x = self.normal_conv(
+            inputs=x,
+            filter_num=num_filters,
+            kernel=(3,3),
+            stride=(2,2),
+            padding='SAME',
+            use_relu=True,
+            name="conv",
+            norm_type='layer')
+        x = conv_lstm(
+            x=x,
+            kernel_size=(3,3),
+            filters=num_filters)
+
+        size_feat = int(np.ceil(size_feat/2))*num_filters
+        size_length  = tf.cast(tf.math.ceil(tf.cast(size_length,tf.float32)/2), tf.int32)
+        len_seq = tf.cast(tf.math.ceil(tf.cast(len_feats, tf.float32)/2), tf.int32)
+        x = tf.reshape(x, [size_batch, size_length, size_feat])
+
+        outputs = x
+
+        outputs = self.blstm(
+            hidden_output=outputs,
+            len_feas=len_seq,
+            hidden_size=hidden_size,
+            use_residual=use_residual,
+            dropout=dropout,
+            name='blstm_1')
+        outputs, len_seq = self.pooling(outputs, len_seq, 'HALF', 1)
+
+        outputs = self.blstm(
+            hidden_output=outputs,
+            len_feas=len_seq,
+            hidden_size=hidden_size,
+            use_residual=use_residual,
+            dropout=dropout,
+            name='blstm_2')
+        outputs, len_seq = self.pooling(outputs, len_seq, 'SAME', 2)
+
+
+        pad_mask = tf.tile(tf.expand_dims(tf.sequence_mask(len_seq, tf.shape(outputs)[1], tf.float32), -1),
+                           [1, 1, hidden_size])
+        outputs *= pad_mask
+
+        return outputs, len_seq

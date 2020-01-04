@@ -117,7 +117,6 @@ class ASR_scp_DataSet(ASRDataSet):
                 [self.token2idx.get(token, self.token2idx['<unk>'])
                 for token in trans] + self.end_id,
                 dtype=np.int32)
-            import pdb; pdb.set_trace()
         except KeyError:
             print('Not found {}!'.format(self.list_uttids[idx]))
             sample = None

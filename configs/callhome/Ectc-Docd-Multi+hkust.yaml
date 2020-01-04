@@ -1,10 +1,10 @@
 dirs:
     exp: callhome
     train:
-        scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.scp
-        phone: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.phone
-        char: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.char
-        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train_phone_char
+        scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust.scp
+        phone: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust.phone
+        char: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust.char
+        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train+hkust_phone_char
     untrain:
         # scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.scp
         # phone: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.phone
@@ -29,7 +29,7 @@ dirs:
     type: scp_multi
     vocab_phone: /home/easton/data/CALLHOME/Mandarin/phones.vocab
     vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
-    # checkpoint_G: /home/easton/projects/asr-tf1/exps/callhome/callhome_Ectc-Docd-Multi/supervise_share_encoder/checkpoint/model_G-8199
+    checkpoint_G: /home/easton/projects/asr-tf1/exps/callhome/Ectc-Docd-Multi+hkust/sueprvised/checkpoint/model_G-1599
 
 data:
     featType: mfcc
@@ -95,7 +95,7 @@ max_feat_len: 1230
 max_label_len: 20
 num_batch_tokens: 40000
 # num_batch_tokens: 10000
-bucket_boundaries: 69,122,170,216,264,315,375,447,548,718,1119,3681,4036
+bucket_boundaries: 129,191,238,279,317,355,395,437,488,553,650,854,3171,4036
 
 lambda_lm: 0.0
 lambda_l2: 0.0

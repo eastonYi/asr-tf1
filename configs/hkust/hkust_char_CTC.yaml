@@ -2,15 +2,15 @@ dirs:
     exp: hkust
     train:
         scp: /home/easton/data/HKUST/HKUST_80/train/feats.scp
-        trans: /home/easton/data/HKUST/HKUST_80/train/train.char
+        trans: /home/easton/data/HKUST/HKUST_80/train/train_clean.char
         tfdata: /home/easton/data/HKUST/HKUST_80/tfdata/train_char
     dev:
         scp: /home/easton/data/HKUST/HKUST_80/dev/feats.scp
-        trans: /home/easton/data/CALLHOME/Mandarin/dev_dim80/dev.char
+        trans: /home/easton/data/HKUST/HKUST_80/dev/dev.char
         tfdata: /home/easton/data/HKUST/HKUST_80/tfdata/dev_char
     test:
         scp: /home/easton/data/HKUST/HKUST_80/dev/feats.scp
-        trans: /home/easton/data/CALLHOME/Mandarin/dev_dim80/dev.char
+        trans: /home/easton/data/HKUST/HKUST_80/dev/dev.char
         tfdata: /home/easton/data/HKUST/HKUST_80/tfdata/dev_char
     text:
         data: /home/easton/data/HKUST/HKUST_80/train/text.char
@@ -26,6 +26,7 @@ data:
     downsample: 1
     add_delta: False
     unit: word
+    add_eos: False
 
 model:
     type: ctcModel

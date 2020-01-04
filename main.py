@@ -134,7 +134,7 @@ def train():
             if global_step % args.decode_step == args.decode_step - 1:
                 decode_test(
                     step=global_step,
-                    sample=args.dataset_test[10],
+                    sample=args.dataset_test.uttid2sample(args.sample_uttid),
                     model=model_infer,
                     sess=sess,
                     unit=args.data.unit,

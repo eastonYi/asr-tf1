@@ -176,6 +176,8 @@ elif args.model.encoder.type == 'transformer_encoder_8x':
     from models.encoders.transformer_encoder import Transformer_Encoder_8x as encoder
 elif args.model.encoder.type == 'conv_lstm':
     from models.encoders.conv_lstm import CONV_LSTM as encoder
+elif args.model.encoder.type == 'conv_lstm_4x':
+    from models.encoders.conv_lstm import CONV_LSTM_4x as encoder
 elif args.model.encoder.type == 'classifier':
     from models.encoders.classifier import CONV_LSTM_Classifier as encoder
 elif args.model.encoder.type == 'BLSTM':

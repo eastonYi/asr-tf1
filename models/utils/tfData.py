@@ -157,6 +157,22 @@ class TFDataReader:
 
         return list_outputs[0], list_outputs[1], list_outputs[2], seq_len_feats, seq_len_phone, seq_len_label
 
+    def fentch_multi_batch(self, batch_size):
+        list_inputs = [self.feat, self.phone, self.label,
+                       tf.shape(self.feat)[0], tf.shape(self.phone)[0], tf.shape(self.label)[0]]
+        list_outputs = tf.train.batch(
+            tensors=list_inputs,
+            batch_size=batch_size,
+            num_threads=8,
+            capacity=30,
+            dynamic_pad=True,
+            allow_smaller_final_batch=True)
+        seq_len_feats = tf.reshape(list_outputs[3], [-1])
+        seq_len_phone = tf.reshape(list_outputs[4], [-1])
+        seq_len_label = tf.reshape(list_outputs[5], [-1])
+
+        return list_outputs[0], list_outputs[1], list_outputs[2], seq_len_feats, seq_len_phone, seq_len_label
+
     def fentch_batch_bucket(self):
         list_inputs = [self.feat, self.label, tf.shape(self.feat)[0], tf.shape(self.label)[0]]
         _, list_outputs = tf.contrib.training.bucket_by_sequence_length(

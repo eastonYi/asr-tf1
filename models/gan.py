@@ -382,10 +382,10 @@ class GAN_2(GAN):
 
         unfeature = tensors_input.unfeature_splits[id_gpu]
         len_unfeatures = tensors_input.len_unfeat_splits[id_gpu]
-        unphones = tensors_input.unphone_splits[id_gpu]
-        len_unphones = tensors_input.len_unphone_splits[id_gpu]
-        unlabels = tensors_input.unlabel_splits[id_gpu]
-        len_unlabels = tensors_input.len_unlabel_splits[id_gpu]
+        # unphones = tensors_input.unphone_splits[id_gpu]
+        # len_unphones = tensors_input.len_unphone_splits[id_gpu]
+        # unlabels = tensors_input.unlabel_splits[id_gpu]
+        # len_unlabels = tensors_input.len_unlabel_splits[id_gpu]
         text = tensors_input.text_splits[id_gpu]
         len_text = tensors_input.len_text_splits[id_gpu]
 
@@ -440,10 +440,11 @@ class GAN_2(GAN):
             loss_D_text = -tf.reduce_mean(logits_D_text, 0)
 
             # D loss greadient penalty
+            batch_size = tf.reduce_min([tf.shape(feature_text)[0], tf.shape(logits_G_un)[0]])
             gp = 10.0 * self.D.gradient_penalty(
-                real=feature_text[0:tf.shape(logits_G_un)[0]],
-                fake=tf.nn.softmax(logits_G_un, -1),
-                len_inputs=len_decoded)
+                real=feature_text[:batch_size],
+                fake=tf.nn.softmax(logits_G_un[:batch_size], -1),
+                len_inputs=len_decoded[:batch_size])
             # gp = tf.constant(0.0)
 
             # loss_D = tf.constant(0.0)
