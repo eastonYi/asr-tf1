@@ -29,7 +29,8 @@ dirs:
     type: scp_multi
     vocab_phone: /home/easton/data/CALLHOME/Mandarin/phones.vocab
     vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
-    # checkpoint_G: /home/easton/projects/asr-tf1/exps/callhome/callhome_Ectc-Docd-Multi/supervise_share_encoder/checkpoint/model_G-8199
+    # checkpoint_G: /home/easton/projects/asr-tf1/exps/callhome/callhome_Ectc-Docd-Multi/conv-lstm_mergeTrue/checkpoint/model_G-16399
+    # checkpoint_G_en: /home/easton/projects/asr-tf1/exps/callhome/callhome_Ectc-Docd-Multi/conv-lstm_mergeTrue/checkpoint/model_G-16399
 
 data:
     featType: mfcc

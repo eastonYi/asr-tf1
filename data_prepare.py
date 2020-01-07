@@ -20,7 +20,7 @@ def main():
     # TFDataSaver(args.dataset_dev, args.dirs.dev.tfdata, args, size_file=10000, max_feat_len=3000).split_save()
     # print(args.data.dim_feature)
     # feat, label = readTFRecord(args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
-    get_bucket(args.dirs.train.tfdata / 'feature_length.txt', args.num_batch_tokens, 120)
+    get_bucket(args.dirs.train.tfdata / 'feature_length.txt', args.num_batch_tokens, 60)
 
 if __name__ == '__main__':
     import os

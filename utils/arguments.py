@@ -191,7 +191,6 @@ else:
 args.model.encoder.type = encoder
 
 ## decoder
-# try:
 if args.model.decoder.type == 'FC':
     from models.decoders.fc_decoder import FCDecoder as decoder
 elif args.model.decoder.type == 'conv_decoder':
@@ -203,13 +202,7 @@ elif args.model.decoder.type == 'transformer_decoder':
 else:
     raise NotImplementedError('not found decoder type: {}'.format(args.model.decoder.type))
 args.model.decoder.type = decoder
-# except:
-#     print("not using decoder!")
-#     args.model.decoder = AttrDict()
-#     args.model.decoder.size_embedding = None
-#     args.model.decoder.type = None
 
-## model
 if args.model.type == 'Seq2SeqModel':
     from models.seq2seqModel import Seq2SeqModel as Model
 elif args.model.type == 'ctcModel':
@@ -220,6 +213,20 @@ elif args.model.type == 'Ectc_Docd':
     from models.Ectc_Docd import Ectc_Docd as Model
 elif args.model.type == 'Ectc_Docd_Multi':
     from models.Ectc_Docd import Ectc_Docd_Multi as Model
+    if args.model.encoder2:
+        if args.model.encoder2.type == 'transformer_encoder':
+            from models.encoders2.transformer_encoder import Transformer_Encoder as encoder
+        elif args.model.encoder2.type == 'conv_lstm':
+            from models.encoders.conv_lstm import CONV_LSTM as encoder
+        elif args.model.encoder2.type == 'conv_lstm_4x':
+            from models.encoders.conv_lstm import CONV_LSTM_4x as encoder
+        elif args.model.encoder2.type == 'BLSTM':
+            from models.encoders.blstm import BLSTM as encoder
+        elif args.model.encoder2.type == 'conv2':
+            from models.encoders.conv2 import CONV as encoder
+        else:
+            raise NotImplementedError('not found encoder type: {}'.format(args.model.encoder2.type))
+        args.model.encoder2.type = encoder
 elif args.model.type == 'ctc_ce':
     from models.CTC_CE import CTC_CE as Model
 elif args.model.type == 'classifier':

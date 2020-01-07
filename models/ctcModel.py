@@ -88,8 +88,7 @@ class CTCModel(Seq2SeqModel):
             labels_sparse,
             logits,
             sequence_length=len_logits,
-            # ctc_merge_repeated=False,
-            ctc_merge_repeated=True,
+            ctc_merge_repeated=self.args.model.merge_repeat,
             ignore_longer_outputs_than_inputs=True,
             time_major=False)
 

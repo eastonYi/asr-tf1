@@ -18,7 +18,8 @@ class Ectc_Docd(CTCModel):
     CTC model is viewed as seq2seq model with the final FC layer as decoder.
     '''
     def __init__(self, tensor_global_step, encoder, decoder, training, args,
-                 batch=None, name='Ectc_Docd'):
+                 encoder2=None, batch=None, name='Ectc_Docd'):
+        self.gen_encoder2 = encoder2 # encoder class
         super().__init__(tensor_global_step, encoder, decoder, training, args, batch, name)
 
     def __call__(self, feature, len_features, reuse=False):
@@ -26,6 +27,10 @@ class Ectc_Docd(CTCModel):
             encoder = self.gen_encoder(
                 training=self.training,
                 args=self.args)
+            if self.gen_encoder2:
+                encoder2 = self.gen_encoder2(
+                    training=self.training,
+                    args=self.args)
             decoder0 = FCDecoder(
                 training=self.training,
                 global_step=self.global_step,
@@ -51,8 +56,8 @@ class Ectc_Docd(CTCModel):
             # shrink layer
             # encoded = batch_splice(feature, 5, 5)
             with tf.variable_scope(decoder.name or 'decoder'):
-                if not self.args.model.decoder.share_encoder:
-                    encoded, len_encoded = encoder(feature, len_features)
+                if self.args.model.encoder2:
+                    encoded, len_encoded = encoder2(feature, len_features)
                 encoded_shrunk, len_encoded_shrunk = shrink_layer(
                     encoded, len_encoded, logits_ctc, encoded.get_shape()[-1])
                 if not self.args.model.decoder.half:
@@ -128,7 +133,6 @@ class Ectc_Docd(CTCModel):
         if self.training:
             return loss, gradients, [ctc_loss, ce_loss, align, labels, x]
         else:
-            # return logits_ctc, decoded, len_logits_ctc
             return (logits_ctc, logits_ocd), (align, decoded), (len_logits_ctc, len_logits_ocd)
 
     def ce_loss(self, logits, labels, len_labels):
@@ -176,8 +180,54 @@ class Ectc_Docd_Multi(Ectc_Docd):
     multi-label Ectc_Docd
     '''
     def __init__(self, tensor_global_step, encoder, decoder, training, args,
-                 batch=None, name='Ectc_Docd_Multi'):
-        super().__init__(tensor_global_step, encoder, decoder, training, args, batch, name)
+                 encoder2=None, batch=None, name='Ectc_Docd_Multi'):
+        super().__init__(tensor_global_step, encoder, decoder, training, args, encoder2, batch, name)
+
+    def __call__(self, feature, len_features, reuse=False):
+        with tf.variable_scope(self.name, reuse=reuse):
+            encoder = self.gen_encoder(
+                training=self.training,
+                args=self.args)
+            if self.gen_encoder2:
+                encoder2 = self.gen_encoder2(
+                    training=self.training,
+                    args=self.args)
+            decoder0 = FCDecoder(
+                training=self.training,
+                global_step=self.global_step,
+                args=self.args,
+                name='ctc_decoder')
+            decoder = self.gen_decoder(
+                training=self.training,
+                global_step=self.global_step,
+                args=self.args,
+                name='ocd_decoder')
+
+            with tf.variable_scope(encoder.name or 'encoder'):
+                encoded, len_encoded = encoder(feature, len_features)
+
+            with tf.variable_scope(decoder0.name or 'decoder0'):
+                logits_ctc, align, len_logits_ctc = decoder0(
+                    encoded, len_encoded, None,
+                    shrink=False,
+                    num_fc=self.args.model.decoder.num_fc,
+                    hidden_size=self.args.model.decoder.hidden_size,
+                    dim_output=self.args.dim_output)
+
+            # shrink layer
+            # encoded = batch_splice(feature, 5, 5)
+            with tf.variable_scope(decoder.name or 'decoder'):
+                if self.args.model.encoder2:
+#                     encoded, len_encoded = encoder(feature, len_features)
+                    encoded, len_encoded = encoder2(feature, len_features)
+                encoded_shrunk, len_encoded_shrunk = shrink_layer(
+                    encoded, len_encoded, logits_ctc, encoded.get_shape()[-1])
+                if not self.args.model.decoder.half:
+                    encoded_shrunk = batch_splice(encoded_shrunk, 0, 0, jump=True)
+                    len_encoded_shrunk = tf.cast(tf.ceil(tf.cast(len_encoded_shrunk, tf.float32)/2), tf.int32)
+                logits_ocd, decoded, len_logits_ocd = decoder(encoded_shrunk, len_encoded_shrunk, None)
+
+        return [logits_ctc, logits_ocd], [align, decoded], [len_logits_ctc, len_logits_ocd]
 
     def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
         feature = tensors_input.feature_splits[id_gpu]
@@ -202,6 +252,8 @@ class Ectc_Docd_Multi(Ectc_Docd):
                     len_logits=len_logits_ctc,
                     labels=phones,
                     len_labels=len_phones)
+                if self.args.model.confidence_penalty:
+                    ctc_loss += self.args.model.confidence_penalty * confidence_penalty(logits_ctc, len_logits_ctc)
 
                 # ce loss
                 len_labels = tf.where(len_labels<len_logits_ocd, len_labels, len_logits_ocd)
@@ -217,11 +269,6 @@ class Ectc_Docd_Multi(Ectc_Docd):
                 loss = ctc_loss + ce_loss
                 # loss = ctc_loss
                 # loss = ctc_loss + ce_loss
-
-                if self.args.model.confidence_penalty:
-                    cp_loss = self.args.model.confidence_penalty * confidence_penalty(logits_ctc, len_logits_ctc)
-                    assert cp_loss.get_shape().ndims == 1
-                    loss += cp_loss
 
                 with tf.name_scope("gradients"):
                     assert loss.get_shape().ndims == 1
