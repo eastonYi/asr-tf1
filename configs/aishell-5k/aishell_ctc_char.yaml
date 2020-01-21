@@ -1,12 +1,12 @@
 dirs:
     exp: aishell
     train:
-        scp: /home/easton/data/AISHELL/feats/feats.train-10k.scp
-        trans: /home/easton/data/AISHELL/char/train-10k.char
-        tfdata: /home/easton/data/AISHELL/char/tfdata/train-10k_phone_char
-        # scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
-        # trans: /home/easton/data/AISHELL/char/train-120k.char
-        # tfdata: /home/easton/data/AISHELL/char/tfdata/train-120k_phone_char
+        # scp: /home/easton/data/AISHELL/feats/feats.train-10k.scp
+        # trans: /home/easton/data/AISHELL/char/train-10k.char
+        # tfdata: /home/easton/data/AISHELL/char/tfdata/train-10k_phone_char
+        scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
+        trans: /home/easton/data/AISHELL/char/train-120k.char
+        tfdata: /home/easton/data/AISHELL/char/tfdata/train-120k_phone_char
     dev:
         scp: /home/easton/data/AISHELL/feats/feats.dev-14k.scp
         trans: /home/easton/data/AISHELL/char/dev-14k.char
@@ -44,11 +44,11 @@ model:
     encoder:
         type: conv_lstm
         num_filters: 64
-        hidden_size: 512
+        hidden_size: 1200
     decoder:
         type: FC
         hidden_size: 256
-        num_fc: 1
+        num_fc: 0
         label_smoothing: 0.95
 
 optimizer: adam
@@ -72,7 +72,7 @@ text_batch_size: 200
 max_feat_len: 1230
 max_label_len: 60
 num_batch_tokens: 80000
-bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1231
+bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1230
 
 lambda_lm: 0.0
 lambda_l2: 0.0

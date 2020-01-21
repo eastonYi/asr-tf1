@@ -76,7 +76,7 @@ class CTCModel(Seq2SeqModel):
         else:
             return logits, align, len_logits
 
-    def ctc_loss(self, logits, len_logits, labels, len_labels):
+    def ctc_loss(self, logits, len_logits, labels, len_labels, merge_repeat=True):
         """
         No valid path found: It is possible that no valid path is found if the
         activations for the targets are zero.
@@ -88,7 +88,7 @@ class CTCModel(Seq2SeqModel):
             labels_sparse,
             logits,
             sequence_length=len_logits,
-            ctc_merge_repeated=self.args.model.merge_repeat,
+            ctc_merge_repeated=merge_repeat,
             ignore_longer_outputs_than_inputs=True,
             time_major=False)
 

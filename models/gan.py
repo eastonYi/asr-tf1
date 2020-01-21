@@ -393,14 +393,21 @@ class GAN_2(GAN):
             # G loss
             (logits_ctc, logits_ocd), _, (len_logits_ctc, len_logits_ocd) = self.G(
                 feature, len_features, reuse=True)
+            # [logits_ctc, logits_ctc_2, logits_ocd], _, [len_logits_ctc, len_logits_ctc_2, len_logits_ocd] = self.G(
+            #     feature, len_features, reuse=True)
             ctc_loss = self.G.ctc_loss(
                 logits=logits_ctc,
                 len_logits=len_logits_ctc,
                 labels=phones,
                 len_labels=len_phones)
+            # ctc_loss_2 = self.G.ctc_loss(
+            #     logits=logits_ctc_2,
+            #     len_logits=len_logits_ctc_2,
+            #     labels=phones,
+            #     len_labels=len_phones)
             if self.args.model.confidence_penalty:
                 ctc_loss += self.args.model.confidence_penalty * confidence_penalty(logits_ctc, len_logits_ctc)
-            # logits_ocd = tf.Print(logits_ocd, [len_labels, len_logits_ocd], 'len_labels, len_logits_ocd: ', summarize=20)
+                # ctc_loss_2 += self.args.model.confidence_penalty * confidence_penalty(logits_ctc_2, len_logits_ctc_2)
 
             len_labels = tf.where(len_labels<len_logits_ocd, len_labels, len_logits_ocd)
             len_labels = tf.where(len_labels>tf.ones_like(len_labels), len_labels, tf.ones_like(len_labels))
@@ -411,23 +418,18 @@ class GAN_2(GAN):
                 labels=labels[:, :min_len],
                 len_labels=len_labels)
 
-            loss_G_supervise = ce_loss
-            # loss_G_supervise = ctc_loss + ce_loss
+            if self.args.gan_add_ctc_loss:
+                loss_G_supervise = ctc_loss + ce_loss
+            else:
+                loss_G_supervise = ce_loss
+#             loss_G_supervise = ctc_loss_2 + ce_loss
             loss_G_supervise = tf.reduce_mean(loss_G_supervise)
 
             (_, logits_G_un), _, (_, len_decoded) = self.G(unfeature, len_unfeatures, reuse=True)
+            # (_, _, logits_G_un), _, (_, _, len_decoded) = self.G(unfeature, len_unfeatures, reuse=True)
             # sample_mask = tf.cast(tf.equal(len_unlabel, len_decoded), tf.float32)
             # sample_mask = tf.zeros_like(len_label, dtype=tf.float32)
             # sample_mask = tf.ones_like(len_unlabel, dtype=tf.float32)
-
-            # supervise
-            # len_unlabels = tf.where(len_unlabels<len_decoded, len_unlabels, len_decoded)
-            # min_len = tf.reduce_min([tf.shape(logits_G_un)[1], tf.shape(unlabels)[1]])
-            # ce_loss = self.G.ce_loss(
-            #     logits=logits_G_un[:, :min_len, :],
-            #     labels=unlabels[:, :min_len],
-            #     len_labels=len_unlabels)
-            # loss_G_supervise += tf.reduce_mean(ce_loss)
 
             # D loss fake
             logits_G_un = batch3D_pad_to(logits_G_un, length=self.args.max_label_len)
@@ -440,11 +442,10 @@ class GAN_2(GAN):
             loss_D_text = -tf.reduce_mean(logits_D_text, 0)
 
             # D loss greadient penalty
-            batch_size = tf.reduce_min([tf.shape(feature_text)[0], tf.shape(logits_G_un)[0]])
             gp = 10.0 * self.D.gradient_penalty(
-                real=feature_text[:batch_size],
-                fake=tf.nn.softmax(logits_G_un[:batch_size], -1),
-                len_inputs=len_decoded[:batch_size])
+                real=feature_text[0:tf.shape(logits_G_un)[0]],
+                fake=tf.nn.softmax(logits_G_un, -1),
+                len_inputs=len_decoded)
             # gp = tf.constant(0.0)
 
             # loss_D = tf.constant(0.0)
@@ -456,11 +457,9 @@ class GAN_2(GAN):
                 gradients_D = self.optimizer_D.compute_gradients(
                     loss_D, var_list=self.D.trainable_variables())
                 gradients_G = self.optimizer_G.compute_gradients(
-                    loss_G, var_list=self.G.trainable_variables(self.G.name+'/'+'ocd_decoder'))
-                    # loss_G, var_list=self.G.trainable_variables(self.G.name+'/ocd_decoder/'+'dense')+\
-                    #                  self.G.trainable_variables(self.G.name+'/ocd_decoder/'+'dense_1')+\
-                    #                  self.G.trainable_variables(self.G.name+'/ocd_decoder/'+'dense_2')+\
-                    #                  self.G.trainable_variables(self.G.name+'/ocd_decoder/'+'fully_connected'))
+                    # loss_G, var_list=self.G.trainable_variables(self.G.name))
+                    loss_G, var_list=self.G.trainable_variables(self.G.name+'/G'))
+                    # loss_G, var_list=self.G.trainable_variables(self.G.name+'/G/decoder2'))
 
         self.__class__.num_Model += 1
         logging.info('\tbuild {} on {} succesfully! total model number: {}'.format(

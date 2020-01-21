@@ -37,6 +37,7 @@ def train():
     G = args.Model(
         tensor_global_step,
         encoder=args.model.encoder.type,
+        encoder2=args.model.encoder2.type,
         decoder=args.model.decoder.type,
         batch=batch_train,
         training=True,
@@ -45,18 +46,19 @@ def train():
     G_infer = args.Model(
         tensor_global_step,
         encoder=args.model.encoder.type,
+        encoder2=args.model.encoder2.type,
         decoder=args.model.decoder.type,
         training=False,
         args=args)
-    vars = G.trainable_variables()
+    vars_ASR = G.trainable_variables()
     vars_spiker = G.trainable_variables(G.name+'/spiker')
-    # vars_G_ocd = G.trainable_variables('Ectc_Docd/ocd_decoder')
 
     size_variables()
 
     start_time = datetime.now()
-    saver = tf.train.Saver(vars, max_to_keep=30)
+    saver_ASR = tf.train.Saver(vars_ASR, max_to_keep=30)
     saver_S = tf.train.Saver(vars_spiker, max_to_keep=30)
+    saver = tf.train.Saver(max_to_keep=15)
     summary = Summary(str(args.dir_log))
     step_bias = 0
 
@@ -66,16 +68,17 @@ def train():
     config.log_device_placement = False
     with tf.train.MonitoredTrainingSession(config=config) as sess:
         dataloader_dev.sess = sess
-        if args.dirs.checkpoint:
-            saver.restore(sess, args.dirs.checkpoint)
-            step_bias = int(args.dirs.checkpoint.split('-')[-1])
+        if args.dirs.checkpoint_G:
+            saver_ASR.restore(sess, args.dirs.checkpoint_G)
+            step_bias = int(args.dirs.checkpoint_G.split('-')[-1])
         if args.dirs.checkpoint_S:
-            saver_S.restore(sess, args.dirs.checkpoint_G_en)
+            saver_S.restore(sess, args.dirs.checkpoint_S)
 
         batch_time = time()
         num_processed = 0
         progress = 0
         while progress < args.num_epochs:
+
             # supervised training
             global_step, lr = sess.run([tensor_global_step, G.learning_rate])
             global_step += step_bias
@@ -86,14 +89,14 @@ def train():
             progress = num_processed/args.data.train_size
 
             if global_step % 40 == 0:
-                print('ctc_loss: {:.2f}, ce_loss: {:.2f} batch: {} lr:{:.1e} {:.2f}s {:.3f}% step: {}'.format(
+                print('ctc_loss: {:.2f},  ce_loss: {:.2f} batch: {} lr:{:.1e} {:.2f}s {:.3f}% step: {}'.format(
                      np.mean(ctc_loss), np.mean(ce_loss), shape_batch, lr, used_time, progress*100, global_step))
 
             if global_step % args.save_step == args.save_step - 1:
-                saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step)
-                print('saved S-C in',  str(args.dir_checkpoint)+'/model-'+str(global_step))
+                saver_ASR.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step)
+                print('saved ASR model in',  str(args.dir_checkpoint)+'/model-'+str(global_step))
                 saver_S.save(get_session(sess), str(args.dir_checkpoint/'model_S'), global_step=global_step)
-                print('saved S in',  str(args.dir_checkpoint)+'/model_S-'+str(global_step))
+                print('saved Spiker model in',  str(args.dir_checkpoint)+'/model_S-'+str(global_step))
 
             if global_step % args.dev_step == args.dev_step - 1:
             # if global_step % args.dev_step == 0:
@@ -153,6 +156,7 @@ def train_gan():
     G = args.Model(
         tensor_global_step,
         encoder=args.model.encoder.type,
+        encoder2=args.model.encoder2.type,
         decoder=args.model.decoder.type,
         batch=batch_train,
         training=True,
@@ -161,11 +165,12 @@ def train_gan():
     G_infer = args.Model(
         tensor_global_step,
         encoder=args.model.encoder.type,
+        encoder2=args.model.encoder2.type,
         decoder=args.model.decoder.type,
         training=False,
         args=args)
     vars_ASR = G.trainable_variables()
-    vars_spiker = G.trainable_variables(G.name+'/spiker')
+    # vars_G_ocd = G.trainable_variables('Ectc_Docd/ocd_decoder')
 
     D = args.Model_D(
         tensor_global_step1,
@@ -179,10 +184,9 @@ def train_gan():
     size_variables()
 
     start_time = datetime.now()
-    saver_ASR = tf.train.Saver(vars_ASR, max_to_keep=30)
+    saver_ASR = tf.train.Saver(vars_ASR, max_to_keep=10)
     saver = tf.train.Saver(max_to_keep=15)
     summary = Summary(str(args.dir_log))
-    step_bias = 0
 
     config = tf.ConfigProto()
     config.allow_soft_placement = True
@@ -202,7 +206,7 @@ def train_gan():
             # semi_supervise
             global_step, lr_G, lr_D = sess.run([tensor_global_step0, gan.learning_rate_G, gan.learning_rate_D])
 
-            for _ in range(2):
+            for _ in range(3):
                 text = sess.run(iter_text)
                 text_lens = get_batch_length(text)
                 shape_text = text.shape
@@ -214,7 +218,7 @@ def train_gan():
                 sess.run([gan.list_train_G, gan.list_feature_shape])
 
             num_processed += shape_batch[0]
-            num_processed_unbatch += shape_unbatch[0]
+            # num_processed_unbatch += shape_unbatch[0]
             used_time = time()-batch_time
             batch_time = time()
             progress = num_processed/args.data.train_size
@@ -228,8 +232,10 @@ def train_gan():
                 summary.summary_scalar('ce_loss', np.mean(ce_loss), global_step)
 
             if global_step % args.save_step == args.save_step - 1:
-                saver_ASR.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step)
-                print('saved ASR model in',  str(args.dir_checkpoint)+'/model-'+str(global_step))
+                saver_ASR.save(get_session(sess), str(args.dir_checkpoint/'model_G'), global_step=global_step, write_meta_graph=True)
+                print('saved G in',  str(args.dir_checkpoint)+'/model_G-'+str(global_step))
+                # saver_G_en.save(get_session(sess), str(args.dir_checkpoint/'model_G_en'), global_step=global_step, write_meta_graph=True)
+                # print('saved model in',  str(args.dir_checkpoint)+'/model_G_en-'+str(global_step))
 
             if global_step % args.dev_step == args.dev_step - 1:
             # if True:

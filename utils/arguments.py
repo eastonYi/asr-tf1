@@ -2,6 +2,7 @@ import logging
 import sys
 import os
 import yaml
+import shutil
 from pathlib import Path
 from argparse import ArgumentParser
 logging.basicConfig(level=logging.INFO, stream=sys.stdout, format='%(levelname)s(%(filename)s:%(lineno)d): %(message)s')
@@ -14,11 +15,12 @@ parser = ArgumentParser()
 parser.add_argument('-m', type=str, dest='mode', default='train')
 parser.add_argument('--name', type=str, dest='name', default=None)
 parser.add_argument('--gpu', type=str, dest='gpu', default=None)
-parser.add_argument('-c', type=str, dest='config')
+parser.add_argument('--c', type=str, dest='config')
 
 param = parser.parse_args()
 
-CONFIG_FILE = param.config
+CONFIG_FILE = sys.argv[-1]
+# CONFIG_FILE = param.config
 args = AttrDict(yaml.load(open(CONFIG_FILE), Loader=yaml.SafeLoader))
 
 args.mode = param.mode
@@ -57,6 +59,8 @@ mkdirs(dir_exps)
 mkdirs(args.dir_exps)
 mkdirs(args.dir_log)
 mkdirs(args.dir_checkpoint)
+
+shutil.copy(CONFIG_FILE, str(args.dir_exps))
 
 # vocab
 args.token2idx, args.idx2token = load_vocab(args.dirs.vocab)
@@ -180,12 +184,14 @@ elif args.model.encoder.type == 'conv_lstm_4x':
     from models.encoders.conv_lstm import CONV_LSTM_4x as encoder
 elif args.model.encoder.type == 'classifier':
     from models.encoders.classifier import CONV_LSTM_Classifier as encoder
-elif args.model.encoder.type == 'BLSTM':
+elif args.model.encoder.type == 'blsrm':
     from models.encoders.blstm import BLSTM as encoder
-elif args.model.encoder.type == 'conv':
-    from models.encoders.conv import CONV as encoder
-elif args.model.encoder.type == 'conv2':
-    from models.encoders.conv2 import CONV as encoder
+elif args.model.encoder.type == 'conv_1d':
+    from models.encoders.conv import CONV_1D as encoder
+elif args.model.encoder.type == 'conv_2d':
+    from models.encoders.conv import CONV_2D as encoder
+elif args.model.encoder.type == 'conv_1d_rnn':
+    from models.encoders.conv import CONV_1D_with_RNN as encoder
 else:
     raise NotImplementedError('not found encoder type: {}'.format(args.model.encoder.type))
 args.model.encoder.type = encoder
@@ -195,6 +201,10 @@ if args.model.decoder.type == 'FC':
     from models.decoders.fc_decoder import FCDecoder as decoder
 elif args.model.decoder.type == 'conv_decoder':
     from models.decoders.conv_decoder import CONV_Decoder as decoder
+elif args.model.decoder.type == 'res_decoder':
+    from models.decoders.conv_decoder import ResConv_Decoder as decoder
+elif args.model.decoder.type == 'rnn':
+    from models.decoders.rnn_decoder import RNN_Decoder as decoder
 elif args.model.decoder.type == 'classifier':
     from models.decoders.classifier import FCDecoder as decoder
 elif args.model.decoder.type == 'transformer_decoder':
@@ -203,6 +213,7 @@ else:
     raise NotImplementedError('not found decoder type: {}'.format(args.model.decoder.type))
 args.model.decoder.type = decoder
 
+## model
 if args.model.type == 'Seq2SeqModel':
     from models.seq2seqModel import Seq2SeqModel as Model
 elif args.model.type == 'ctcModel':
@@ -213,20 +224,26 @@ elif args.model.type == 'Ectc_Docd':
     from models.Ectc_Docd import Ectc_Docd as Model
 elif args.model.type == 'Ectc_Docd_Multi':
     from models.Ectc_Docd import Ectc_Docd_Multi as Model
-    if args.model.encoder2:
-        if args.model.encoder2.type == 'transformer_encoder':
-            from models.encoders2.transformer_encoder import Transformer_Encoder as encoder
-        elif args.model.encoder2.type == 'conv_lstm':
-            from models.encoders.conv_lstm import CONV_LSTM as encoder
-        elif args.model.encoder2.type == 'conv_lstm_4x':
-            from models.encoders.conv_lstm import CONV_LSTM_4x as encoder
-        elif args.model.encoder2.type == 'BLSTM':
-            from models.encoders.blstm import BLSTM as encoder
-        elif args.model.encoder2.type == 'conv2':
-            from models.encoders.conv2 import CONV as encoder
-        else:
-            raise NotImplementedError('not found encoder type: {}'.format(args.model.encoder2.type))
-        args.model.encoder2.type = encoder
+elif args.model.type == 'Ectc_Docd_Multi_2En':
+    from models.Ectc_Docd import Ectc_Docd_Multi_2En as Model
+    if args.model.encoder2.type == 'conv_lstm':
+        from models.encoders.conv_lstm import CONV_LSTM as encoder
+    elif args.model.encoder2.type == 'conv_lstm_4x':
+        from models.encoders.conv_lstm import CONV_LSTM_4x as encoder
+    elif args.model.encoder2.type == 'classifier':
+        from models.encoders.classifier import CONV_LSTM_Classifier as encoder
+    elif args.model.encoder2.type == 'blstm':
+        from models.encoders.blstm import BLSTM as encoder
+    elif args.model.encoder2.type == 'conv_1d':
+        from models.encoders.conv import CONV_1D as encoder
+    elif args.model.encoder2.type == 'conv_2d':
+        from models.encoders.conv import CONV_2D as encoder
+    elif args.model.encoder2.type == 'conv_1d_rnn':
+        from models.encoders.conv import CONV_1D_with_RNN as encoder
+    else:
+        raise NotImplementedError('not found encoder type: {}'.format(args.model.encoder2.type))
+    args.model.encoder2.type = encoder
+
 elif args.model.type == 'ctc_ce':
     from models.CTC_CE import CTC_CE as Model
 elif args.model.type == 'classifier':
@@ -242,6 +259,8 @@ args.Model = Model
 if args.model_D:
     if args.model_D.type == 'clm':
         from models.discriminator.clm import CLM as Model_D
+    elif args.model_D.type == 'rnn':
+        from models.discriminator.clm import RNN_CLM as Model_D
     else:
         raise NotImplementedError('not found Model type!')
     args.Model_D = Model_D

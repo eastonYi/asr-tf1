@@ -4,19 +4,19 @@ dirs:
         # scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.scp
         # trans: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.char
         # tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train_char
-        scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train
-        trans: /home/easton/data/CALLHOME/Mandarin/train_dim80/train.char
-        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train_char
+        scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust.scp
+        trans: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust.char
+        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train+hkust_phone_char
     dev:
         scp: /home/easton/data/CALLHOME/Mandarin/dev_dim80/dev.scp
         trans: /home/easton/data/CALLHOME/Mandarin/dev_dim80/dev.char
-        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/dev_char
+        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/dev_phone_char
     test:
         scp: /home/easton/data/CALLHOME/Mandarin/test_dim80/test.scp
         trans: /home/easton/data/CALLHOME/Mandarin/test_dim80/test.char
         tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/test_char
     type: scp
-    vocab: /home/easton/data/CALLHOME/Mandarin/train_dim80/char_2214+1.vocab
+    vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
     # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc2/1k/checkpoint/model-599
     # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc2/Ectc_Docd/checkpoint/model-10799
 
@@ -27,6 +27,7 @@ data:
     downsample: 1
     add_delta: False
     unit: word
+    add_eos: False
 
 model:
     type: ctcModel
@@ -34,7 +35,7 @@ model:
     encoder:
         type: conv_lstm
         num_filters: 64
-        hidden_size: 256
+        hidden_size: 1000
     decoder:
         type: FC
         hidden_size: 256
@@ -50,6 +51,7 @@ dev_step: 200
 decode_step: 200
 save_step: 200
 num_epochs: 99999
+sample_uttid: ma_0003-A-009398-009677
 
 gpus: '0,1,2,3'
 # gpus: '4,5'
@@ -61,7 +63,7 @@ text_batch_size: 200
 max_feat_len: 1230
 max_label_len: 60
 num_batch_tokens: 40000
-bucket_boundaries: 89,162,231,306,398,530,804,1958,4036
+bucket_boundaries: 129,191,238,279,317,355,395,437,488,553,650,854,3171,4036
 
 lambda_lm: 0.0
 lambda_l2: 0.0
