@@ -26,7 +26,7 @@ dirs:
     vocab_phone: /home/easton/data/AISHELL/phone/phones.vocab
     vocab: /home/easton/data/AISHELL/char/char.vocab
     # checkpoint_S: /home/easton/projects/asr-tf1/exps/aishell/Multi_conv/10k_merge1/checkpoint/model_S-3799
-    checkpoint_G: /home/easton/projects/asr-tf1/exps/aishell/Multi-2En_conv_conv-lstm/10k_conv_conv-lstm_conv/checkpoint/model-9999
+    checkpoint_G: /home/easton/projects/asr-tf1/exps/aishell/Multi-2En_conv-lstm_conv/10k_conv-lstm_conv_fc/checkpoint/model-4999
 
 data:
     featType: mfcc
@@ -47,28 +47,28 @@ model:
         num_blocks: 2
         add_ctc: True
         merge_repeat: False
-        fixed: False
+        fixed: True
     encoder2:
         type: conv_lstm
         hidden_size: 256
         num_filters: 64
     decoder:
-        # type: res_decoder
-        # num_blocks: 0
-        # num_filters: 256
-        # hidden_size: 256
-        # num_fc: 1
-        # label_smoothing: 0.95
-        # half: True
-        type: conv_decoder
-        num_blocks: 2
-        num_filters: 64
+        type: res_decoder
+        num_blocks: 0
+        num_filters: 256
         hidden_size: 256
-        left_splice: 1
-        right_splice: 1
         num_fc: 1
         label_smoothing: 0.95
         half: True
+        #type: conv_decoder
+        #num_blocks: 2
+        #num_filters: 64
+        #hidden_size: 256
+        #left_splice: 1
+        #right_splice: 1
+        #num_fc: 1
+        #label_smoothing: 0.95
+        #half: True
 
 model_D:
     type: clm

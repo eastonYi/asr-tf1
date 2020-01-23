@@ -26,7 +26,7 @@ dirs:
     vocab_phone: /home/easton/data/AISHELL/phone/phones.vocab
     vocab: /home/easton/data/AISHELL/char/char.vocab
     checkpoint_S: /home/easton/projects/asr-tf1/exps/aishell/Multi_conv/120k_spiker/checkpoint/model_S-2999
-    # checkpoint_G: /home/easton/projects/asr-tf1/exps/aishell/Multi-2En_conv_conv-lstm/10k_conv-conv-lstm_fc/checkpoint/model-3999
+    #checkpoint_G: /home/easton/projects/asr-tf1/exps/aishell/Multi-2En_conv_conv-lstm/10k_conv-conv-lstm_fc/checkpoint/model-3999
 
 data:
     featType: mfcc
@@ -47,7 +47,7 @@ model:
         num_blocks: 2
         add_ctc: True
         merge_repeat: False
-        fixed: True
+        fixed: False
     encoder2:
         type: conv_lstm
         hidden_size: 256
