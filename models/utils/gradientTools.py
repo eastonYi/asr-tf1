@@ -53,16 +53,12 @@ def handle_gradients(grads_and_vars, args):
         # collect gradient
         # g = tf.scalar_mul(1 / args.trn_streams, g)
 
-        # add l2-penalty
-        if args.lambda_l2 > 0 and ('bias' not in v.name) and (g is not None):
-            g = tf.add(g, tf.scalar_mul(tf.convert_to_tensor(args.lambda_l2), v))
-
         # clip gradient value
-        if args.grad_clip_value > 0 and "lstm" in v.name:
+        if args.grad_clip_value > 0:
             g = tf.clip_by_value(g, -args.grad_clip_value, args.grad_clip_value)
 
         # clip gradient norm
-        if args.grad_clip_norm > 0 and 'lstm' in v.name:
+        if args.grad_clip_norm > 0:
             g = tf.clip_by_norm(g, args.grad_clip_norm)
 
         grads_after_handle.append((g, v))
