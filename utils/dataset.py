@@ -5,6 +5,8 @@ from collections import defaultdict
 from random import shuffle
 from pathlib import Path
 from abc import ABCMeta, abstractmethod
+from pypinyin import pinyin, Style
+from .dataProcess import load_vocab
 
 from .dataProcess import audio2vector, process_raw_feature, down_sample, splice
 from .tools import align2stamp, align2bound, size_bucket_to_put
@@ -32,21 +34,13 @@ class DataSet:
 
 
 class ASRDataSet(DataSet):
-    def __init__(self,file,args,_shuffle,transform):
+    def __init__(self, file, args, _shuffle,transform):
         self.file = file
         self.args = args
         self.transform = transform
         self._shuffle = _shuffle
-        self.token2idx,self.idx2token = args.token2idx,args.idx2token
-        self.end_id = self.gen_end_id(self.token2idx)
-
-    def gen_end_id(self, token2idx):
-        if '<eos>' in token2idx.keys():
-            eos_id = [token2idx['<eos>']]
-        else:
-            eos_id = []
-
-        return eos_id
+        self.token2idx,self.idx2token = args.token2idx, args.idx2token
+        self.end_id = [args.token2idx['<eos>']] if args.data.add_eos else []
 
     @staticmethod
     def gen_utter_list(file):
@@ -58,15 +52,15 @@ class ASRDataSet(DataSet):
 
 
 class ASR_csv_DataSet(ASRDataSet):
-    def __init__(self, list_files, args, _shuffle, transform):
-        super().__init__(list_files, args, _shuffle, transform)
-        self.list_utterances = self.gen_utter_list(list_files)
+    def __init__(self, f_csv, args, _shuffle, transform):
+        super().__init__(f_csv, args, _shuffle, transform)
+        self.list_utterances = self.gen_utter_list(f_csv)
         if _shuffle:
             self.shuffle_utts()
 
     def __getitem__(self, idx):
         utterance = self.list_utterances[idx]
-        wav, seq_label = utterance.strip().split(',')
+        wav, seq_label, _ = utterance.strip().split(',')
         fea = audio2vector(wav, self.args.data.dim_raw_input)
         if self.transform:
             fea = process_raw_feature(fea, self.args)
@@ -81,11 +75,10 @@ class ASR_csv_DataSet(ASRDataSet):
         return sample
 
     @staticmethod
-    def gen_utter_list(list_files):
+    def gen_utter_list(f_csv):
         list_utter = []
-        for file in list_files:
-            with open(file) as f:
-                list_utter.extend(f.readlines())
+        with open(f_csv) as f:
+            list_utter.extend(f.readlines())
         return list_utter
 
     def shuffle_utts(self):
@@ -124,14 +117,18 @@ class ASR_scp_DataSet(ASRDataSet):
                 [self.token2idx.get(token, self.token2idx['<unk>'])
                 for token in trans] + self.end_id,
                 dtype=np.int32)
-        except:
-            print('Not found {}!'.format(self.reader.utt_ids[idx]))
+        except KeyError:
+            print('Not found {}!'.format(self.list_uttids[idx]))
             sample = None
 
         return sample
 
     def __len__(self):
         return len(self.list_uttids)
+
+    def uttid2sample(self, uttid):
+        id = self.list_uttids.index(uttid)
+        return self[id]
 
     def load_trans(self, f_trans):
         dict_trans = {}
@@ -143,6 +140,63 @@ class ASR_scp_DataSet(ASRDataSet):
                 dict_trans[uttid] = trans
 
         return dict_trans
+
+
+class ASR_phone_char_ArkDataSet(ASR_scp_DataSet):
+    """
+    for dataset with phone and char dataset
+    needs:
+        - phone_file
+        - char_file
+        - uttid2wav.txt
+            uttid wav
+        - vocab.txt (used for model output)
+            phone
+        -
+    """
+    def __init__(self, f_scp, f_phone, f_char, args, _shuffle, transform):
+        self.phone2idx, self.idx2phone = args.phone2idx, args.idx2phone
+        super().__init__(f_scp, f_char, args, _shuffle, transform)
+        self.phone_char_rate = 2.0
+        self.dict_phone_trans = self.load_trans(f_phone)
+        self.dict_char_trans = self.load_trans(f_char)
+        self.list_uttids = list(set(self.dict_phone_trans.keys()) & set(self.dict_char_trans.keys()))
+
+        if _shuffle:
+            shuffle(self.list_uttids)
+
+    def __getitem__(self, idx):
+        sample = {}
+
+        try:
+            sample['uttid'] = uttid = self.list_uttids[idx]
+            sample['feature'] = self.reader.read_utt_data(uttid)
+            if self.transform:
+                sample['feature'] = process_raw_feature(sample['feature'], self.args)
+
+            phones = self.dict_phone_trans[uttid]
+            chars = self.dict_char_trans[uttid]
+            sample['phone'] = np.array(
+                [self.phone2idx[token] for token in phones], dtype=np.int32)
+            sample['label'] = np.array(
+                [self.token2idx.get(token, self.token2idx['<unk>'])
+                for token in chars],
+                dtype=np.int32)
+            if not self.fix_char(sample['phone'], sample['label']):
+                sample = None
+        except:
+            print('Not found {}!'.format(self.reader.utt_ids[idx]))
+            sample = None
+
+        return sample
+
+    def fix_char(self, phone_trans, char_trans):
+        res = True
+        if len(phone_trans) / len(char_trans) != self.phone_char_rate:
+            print(phone_trans)
+            print(char_trans)
+            res = False
+        return res
 
 
 class ASR_align_DataSet(ASRDataSet):
@@ -603,7 +657,7 @@ class PTB_LMDataSet(LMDataSet):
     def __init__(self, list_files, args, _shuffle):
         super().__init__(list_files, args, _shuffle)
         self.start_id = args.token2idx['<sos>']
-        self.end_id = args.token2idx['<eos>']
+        self.end_id = [args.token2idx['<eos>']]
 
     def __iter__(self):
         for filename in self.list_files:
@@ -614,7 +668,7 @@ class PTB_LMDataSet(LMDataSet):
                         continue
                     text_ids = [self.token2idx[word] for word in line]
                     src_ids = [self.start_id] + text_ids
-                    tar_ids = text_ids + [self.end_id]
+                    tar_ids = text_ids + self.end_id
 
                     yield src_ids, tar_ids
 
@@ -630,11 +684,30 @@ class TextDataSet(LMDataSet):
             with open(filename) as f:
                 for line in f:
                     line = line.strip().split()
-                    if len(line) > self.args.max_label_len:
-                        continue
                     text_ids = [self.token2idx[word] for word in line]
 
-                    yield text_ids
+                    yield text_ids[:self.args.max_label_len]
+
+
+class PinyinDataSet(TextDataSet):
+
+    def __init__(self, list_files, args, _shuffle):
+        self.pinyin2idx, self.idx2pinyin = load_vocab(args.dirs.vocab_pinyin)
+        super().__init__(list_files, args, _shuffle)
+
+    def __iter__(self):
+        """
+        (Pdb) i
+        [1,18,2,36,1,17,7,9,9,6,25,28,3,5,14,1,11,32,24,16,26,22,3,1,16,15,1,18,8,3,1,4,1]
+        """
+        for filename in self.list_files:
+            with open(filename) as f:
+                for line in f:
+                    line = line.strip()
+                    pinyin_ids = [self.pinyin2idx[i[0]] for i in pinyin(line.replace(' ', ''), style=Style.TONE3)]
+                    text_ids = [self.token2idx[word] for word in line.split()]
+
+                    yield pinyin_ids[:self.args.max_label_len], text_ids[:self.args.max_label_len]
 
 
 class SimpleDataLoader:
@@ -730,8 +803,9 @@ class DataLoader(SimpleDataLoader):
         super().__init__(dataset, num_loops)
         self.args = args
         self.num_thread = num_thread
-        self.num_batch_token = args.num_batch_token
+        self.num_batch_tokens = args.num_batch_tokens
         self.bucket_boundaries = args.bucket_boundaries
+        self.list_batch_size = args.list_infer_batch_size if args.list_infer_batch_size else args.list_batch_size
 
     @abstractmethod
     def __iter__(self):
@@ -755,7 +829,7 @@ class DataLoader(SimpleDataLoader):
             caches[bucket][1].append(seq_labels)
 
             caches[bucket][2] += 1
-            if caches[bucket][2] >= self.args.list_batch_size[id_bucket]:
+            if caches[bucket][2] >= self.list_batch_size[id_bucket]:
                 batch = (caches[bucket][0], caches[bucket][1])
                 yield self.padding_list_seq_with_labels(*batch)
                 caches[bucket] = [[], [], 0]
@@ -767,7 +841,6 @@ class DataLoader(SimpleDataLoader):
                 yield self.padding_list_seq_with_labels(*batch)
                 caches[bucket] = [[], [], 0]
                 # logging.info('empty the bucket {}'.format(bucket))
-
 
 class ASRDataLoader(DataLoader):
     def __init__(self, dataset, args, feat, label, batch_size, num_loops, num_thread=4, size_queue=2000):
@@ -784,3 +857,59 @@ class ASRDataLoader(DataLoader):
 
     def __len__(self):
         return self.size_dataset
+
+
+class ASR_Multi_DataLoader(ASRDataLoader):
+    def __init__(self, dataset, args, feat, phone, label, batch_size, num_loops, num_thread=4, size_queue=2000):
+        super().__init__(dataset, args, feat, label, batch_size, num_loops, num_thread, size_queue)
+        self.phone = phone
+
+    def __iter__(self):
+        buckets = self.args.list_bucket_boundaries
+        # max_length = buckets[-1]
+        caches = defaultdict(lambda: [[], [], [], 0])
+        for _ in range(len(self)*self.num_loops):
+            seq_features, seq_phones, seq_labels = self.sess.run([self.feat, self.phone, self.label])
+
+            id_bucket, bucket = size_bucket_to_put(len(seq_features), buckets)
+            if bucket is None:
+                continue
+            caches[bucket][0].append(seq_features)
+            caches[bucket][1].append(seq_phones)
+            caches[bucket][2].append(seq_labels)
+
+            caches[bucket][3] += 1
+            if caches[bucket][3] >= self.list_batch_size[id_bucket]:
+                batch = (caches[bucket][0], caches[bucket][1], caches[bucket][2])
+                yield self.padding_list_seq_with_multi_labels(*batch)
+                caches[bucket] = [[], [], [], 0]
+
+        # Clean remain samples.
+        for bucket in buckets:
+            if caches[bucket][3] > 0:
+                batch = (caches[bucket][0], caches[bucket][1], caches[bucket][2])
+                yield self.padding_list_seq_with_multi_labels(*batch)
+                caches[bucket] = [[], [], [], 0]
+                # logging.info('empty the bucket {}'.format(bucket))
+
+    @staticmethod
+    def padding_list_seq_with_multi_labels(list_seqs_features,
+                                           list_seqs_phones,
+                                           list_seqs_labels,
+                                           dtype=np.float32,
+                                           value1=0.,
+                                           value2=0):
+        x, len_x = DataLoader.padding_list_seqs(
+            list_seqs=list_seqs_features,
+            dtype=dtype,
+            pad=value1)
+        y, len_y = DataLoader.padding_list_seqs(
+            list_seqs=list_seqs_phones,
+            dtype=np.int32,
+            pad=value2)
+        y1, len_y1 = DataLoader.padding_list_seqs(
+            list_seqs=list_seqs_labels,
+            dtype=np.int32,
+            pad=value2)
+
+        return [x, y, y1, len_x, len_y, len_y1]

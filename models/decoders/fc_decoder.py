@@ -4,21 +4,62 @@ contains the general recurrent decoder class'''
 import tensorflow as tf
 from .decoder import Decoder
 
+
 class FCDecoder(Decoder):
     '''a fully connected decoder for the CTC architecture'''
 
-    def decode(self, encoded, len_encoded, decoder_input, training):
-        dim_output = self.args.dim_output
+    def __call__(self, encoded, len_encoded, decoder_input, shrink=False, num_fc=None, hidden_size=None, dim_output=None):
+        num_fc = num_fc if num_fc else self.args.model.decoder.num_fc
+        hidden_size = hidden_size if hidden_size else self.args.model.decoder.hidden_size
+        dim_output = dim_output if dim_output else self.args.dim_output
+
+        x = encoded
+        for i in range(num_fc):
+            x = tf.layers.dense(x, units=hidden_size, use_bias=True)
+            x = tf.nn.relu(x)
+
         logits = tf.layers.dense(
-            inputs=encoded,
+            inputs=x,
             units=dim_output,
             activation=None,
             use_bias=False,
             name='fully_connected')
 
-        len_decoded = len_encoded
-        logits *= tf.tile(tf.expand_dims(tf.sequence_mask(len_decoded, tf.shape(logits)[1], tf.float32), -1),
-                           [1, 1, dim_output])
-        decoded = tf.argmax(logits, -1)
+        if not shrink:
+            len_logits = len_encoded
+            logits *= tf.tile(tf.expand_dims(tf.sequence_mask(len_logits, tf.shape(logits)[1], tf.float32), -1),
+                              [1, 1, dim_output])
+            align = tf.argmax(logits, -1)
 
-        return logits, decoded, len_decoded
+            return logits, align, len_logits
+        else:
+            batch_size = tf.shape(logits)[0]
+            blank_id = tf.convert_to_tensor(dim_output - 1, dtype=tf.int64)
+            frames_mark = tf.not_equal(tf.argmax(logits, -1), blank_id)
+            prev = tf.concat([tf.ones([batch_size, 1], tf.int64) * blank_id, tf.argmax(logits, -1)[:, :-1]], 1)
+            flag_norepeat = tf.not_equal(prev, tf.argmax(logits, -1))
+            flag = tf.logical_and(flag_norepeat, frames_mark)
+            flag = tf.logical_and(flag, tf.sequence_mask(len_encoded, tf.shape(logits)[1], tf.bool))
+            len_labels = tf.reduce_sum(tf.cast(flag, tf.int32), -1)
+            max_label_len = tf.reduce_max(len_labels)
+            logits_output = tf.zeros([0, max_label_len, dim_output], tf.float32)
+
+            def sent(b, logits_output):
+                logit = tf.gather(logits[b, :, :], tf.where(flag[b, :])[:, 0])
+                pad_logit = tf.zeros([tf.reduce_max([max_label_len - len_labels[b], 0]), dim_output])
+                logits_padded = tf.concat([logit, pad_logit], 0)[:max_label_len, :]
+                logits_output = tf.concat([logits_output, logits_padded[None, :]], 0)
+
+                return b+1, logits_output
+
+            _, logits_output = tf.while_loop(
+            cond=lambda b, *_: tf.less(b, batch_size),
+            body=sent,
+            loop_vars=[0, logits_output],
+            shape_invariants=[tf.TensorShape([]),
+                              tf.TensorShape([None, None, dim_output])])
+
+            len_decoded = len_labels
+            preds = tf.argmax(logits_output, -1)
+
+            return logits_output, preds, len_decoded

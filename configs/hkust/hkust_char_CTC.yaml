@@ -1,18 +1,22 @@
 dirs:
-    exp: hksut
+    exp: hkust
     train:
-        scp: /mnt/lustre/xushuang2/easton/data/hkust/feats_3x.scp
-        trans: /mnt/lustre/xushuang2/easton/data/hkust/char.train_3x.scp
-        tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/train
+        scp: /home/easton/data/HKUST/HKUST_80/train/feats.scp
+        trans: /home/easton/data/HKUST/HKUST_80/train/train_clean.char
+        tfdata: /home/easton/data/HKUST/HKUST_80/tfdata/train_char
     dev:
-        scp: /mnt/lustre/xushuang2/easton/data/hkust/feats.dev.scp
-        trans: /mnt/lustre/xushuang2/easton/data/hkust/char.dev.scp
-        tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/dev
+        scp: /home/easton/data/HKUST/HKUST_80/dev/feats.scp
+        trans: /home/easton/data/HKUST/HKUST_80/dev/dev.char
+        tfdata: /home/easton/data/HKUST/HKUST_80/tfdata/dev_char
     test:
-        scp: /mnt/lustre/xushuang2/easton/data/hkust/feats.dev.scp
-        trans: /mnt/lustre/xushuang2/easton/data/hkust/char.dev.scp
+        scp: /home/easton/data/HKUST/HKUST_80/dev/feats.scp
+        trans: /home/easton/data/HKUST/HKUST_80/dev/dev.char
+        tfdata: /home/easton/data/HKUST/HKUST_80/tfdata/dev_char
+    text:
+        data: /home/easton/data/HKUST/HKUST_80/train/text.char
     type: scp
-    vocab: /mnt/lustre/xushuang2/easton/data/hkust/char_3673+1.vocab
+    # vocab: /home/easton/data/HKUST/HKUST_80/char.vocab
+    vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
     # checkpoint: /data/sxu/easton/projects/EODM/exps/hksut/hkust_CTC/checkpoint
 
 data:
@@ -22,16 +26,19 @@ data:
     downsample: 1
     add_delta: False
     unit: word
+    add_eos: False
 
 model:
-    structure: ctcModel
+    type: ctcModel
+    confidence_penalty: 0.2
     encoder:
-        structure: conv_lstm
-        num_hidden: 1600
+        type: conv_lstm
+        hidden_size: 1024
         num_filters: 64
         dropout: 0.9
     decoder:
-        structure: FC
+        type: FC
+        num_fc: 0
 opti:
     type: adam
     lr: 0.0004
@@ -46,8 +53,9 @@ warmup_steps: 6000
 peak: 0.0002
 decay_steps: 8000
 
-gpus: '0,1,2,3'
+gpus: '4,5,6,7'
 batch_size: 60
+text_batch_size: 200
 beam_size: 1
 num_supervised:
 num_batch_tokens: 40000

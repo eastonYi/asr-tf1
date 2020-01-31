@@ -29,7 +29,8 @@ def average_gradients(tower_grads):
                 grads.append(expanded_grad)
             else:
                 # pass
-                logging.warning('here is a variable: {} in gpu_{} which is independent of the loss'.format(var.name, i))
+                # import pdb; pdb.set_trace()
+                logging.warning('here is a variable: {} in {} which is independent of the loss'.format(var.name, var.device))
 
         # Average over the 'tower' dimension.
         if grad != None:

@@ -5,8 +5,72 @@ from tensorflow.contrib.rnn import GRUCell, LayerNormBasicLSTMCell, DropoutWrapp
 allow_defun = True
 
 
-def single_cell(num_units, is_train, cell_type,
-                dropout=0.0, forget_bias=0.0, dim_project=None):
+def shrink_layer(encoded, len_encoded, logits, dim_hidden):
+
+    batch_size = tf.shape(encoded)[0]
+    blank_id = tf.cast(tf.shape(logits)[-1] - 1, tf.int64)
+    frames_mark = tf.not_equal(tf.argmax(logits, -1), blank_id)
+    prev = tf.concat([tf.ones([batch_size, 1], tf.int64) * blank_id, tf.argmax(logits, -1)[:, :-1]], 1)
+    flag_norepeat = tf.not_equal(prev, tf.argmax(logits, -1))
+    flag = tf.logical_and(flag_norepeat, frames_mark)
+    flag = tf.logical_and(flag, tf.sequence_mask(len_encoded, tf.shape(logits)[1], tf.bool))
+    len_labels = tf.reduce_sum(tf.cast(flag, tf.int32), -1)
+    max_label_len = tf.reduce_max([tf.reduce_max(len_labels), 1])
+    hidden_output = tf.zeros([0, max_label_len, dim_hidden], tf.float32)
+
+    def sent(b, hidden_output):
+        hidden = tf.gather(encoded[b, :, :], tf.where(flag[b, :])[:, 0])
+        pad = tf.zeros([tf.reduce_max([max_label_len - len_labels[b], 0]), dim_hidden])
+        hidden_padded = tf.concat([hidden, pad], 0)[:max_label_len, :]
+        hidden_output = tf.concat([hidden_output, hidden_padded[None, :]], 0)
+
+        return b+1, hidden_output
+
+    _, hidden_output = tf.while_loop(
+    cond=lambda b, *_: tf.less(b, batch_size),
+    body=sent,
+    loop_vars=[0, hidden_output],
+    shape_invariants=[tf.TensorShape([]),
+                      tf.TensorShape([None, None, dim_hidden])])
+
+    len_decoded = len_labels
+
+    return hidden_output, len_decoded
+
+
+def normal_conv(inputs, filter_num, kernel, stride, padding, use_relu, name,
+                w_initializer=None, norm_type="batch"):
+    with tf.variable_scope(name):
+        net = tf.layers.conv2d(inputs, filter_num, kernel, stride, padding,
+                           kernel_initializer=w_initializer, name="conv")
+        if norm_type == "batch":
+            net = tf.layers.batch_normalization(net, name="bn")
+        elif norm_type == "layer":
+            # net = layer_norm(net)
+            net = tf.contrib.layers.layer_norm(net)
+        else:
+            net = net
+        output = tf.nn.relu(net) if use_relu else net
+
+    return output
+
+
+def block(x, num_filters, i, kernel=(3,9)):
+    input = x
+    x = normal_conv(
+        inputs=x,
+        filter_num=num_filters,
+        kernel=kernel,
+        stride=(1,1),
+        padding='SAME',
+        use_relu=True,
+        name="res_"+str(i),
+        norm_type='layer')
+
+    return x+input
+
+
+def single_cell(num_units, is_train, cell_type, dropout=0.0, forget_bias=0.0, dim_project=None):
     """Create an instance of a single RNN cell."""
     # dropout (= 1 - keep_prob) is set to 0 during eval and infer
     dropout = dropout if is_train else 0.0
@@ -213,6 +277,25 @@ def conv(inputs, filters, kernel_size, **kwargs):
   return conv_internal(tf.layers.conv2d, inputs, filters, kernel_size, **kwargs)
 
 
+def blstm(x, len_feas, hidden_size, name):
+    hidden_size /= 2
+
+    with tf.variable_scope(name):
+        f_cell = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(hidden_size)
+        b_cell = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(hidden_size)
+
+        x, _ = tf.nn.bidirectional_dynamic_rnn(
+            cell_fw=f_cell,
+            cell_bw=b_cell,
+            inputs=x,
+            dtype=tf.float32,
+            time_major=False,
+            sequence_length=len_feas)
+        x = tf.concat(x, 2)
+
+    return x
+
+
 def dense_without_vars(inputs,
                        units,
                        activation=tf.identity,
@@ -240,7 +323,7 @@ def dense_without_vars(inputs,
                 b = tf.get_variable("bias", [units], initializer=tf.zeros_initializer)
                 outputs += b
             outputs = activation(outputs)
-            
+
             return tf.reshape(outputs, inputs_shape[:-1] + [units])
         else:
             arg1 = dense_without_vars(inputs, units, tf.identity, use_bias, name='arg1')

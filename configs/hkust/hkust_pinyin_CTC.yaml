@@ -1,7 +1,7 @@
 dirs:
-    exp: hksut
+    exp: hkust
     train:
-        scp: /mnt/lustre/xushuang2/easton/data/hkust/feats_3x.scp
+        scp: /mnt/lustre/xushuang2/easton/data/hkust/feats.train_3x.scp
         trans: /mnt/lustre/xushuang2/easton/data/hkust/pinyin.train_3x.scp
         tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/train_pinyin_xy
     dev:
@@ -24,14 +24,16 @@ data:
     unit: word
 
 model:
-    structure: ctcModel
+    type: ctcModel
+    confidence_penalty: 0.2
     encoder:
-        structure: conv_lstm
-        num_hidden: 1600
+        type: conv_lstm
+        hidden_size: 1024
         num_filters: 64
         dropout: 0.9
     decoder:
-        structure: FC
+        type: FC
+        num_fc: 0
 opti:
     type: adam
     lr: 0.0004
@@ -46,9 +48,10 @@ warmup_steps: 6000
 peak: 0.0002
 decay_steps: 8000
 
-gpus: '5,6,7'
+gpus: '4,5,6,7'
 batch_size: 60
 beam_size: 1
+text_batch_size: 200
 num_supervised:
 num_batch_tokens: 40000
 bucket_boundaries: 172,231,278,321,364,407,457,518,604,766,2083

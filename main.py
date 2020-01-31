@@ -11,7 +11,7 @@ import editdistance as ed
 
 from utils.arguments import args
 from models.utils.tools import get_session, create_embedding, size_variables
-from models.utils.tfData import TFReader, readTFRecord
+from models.utils.tfData import TFDataReader
 from utils.dataset import ASRDataLoader
 from utils.summaryTools import Summary
 from utils.performanceTools import dev, decode_test
@@ -20,11 +20,17 @@ from utils.textTools import array_idx2char, array2text
 
 def train():
     print('reading data form ', args.dirs.train.tfdata)
-    dataReader_train = TFReader(args.dirs.train.tfdata, args=args, training=True, transform=True)
-    batch_train = dataReader_train.fentch_batch_bucket()
+    dataReader_train = TFDataReader(args.dirs.train.tfdata, args=args, _shuffle=True, transform=True)
+    dataReader_dev = TFDataReader(args.dirs.dev.tfdata, args=args, _shuffle=False, transform=True)
 
-    feat, label = readTFRecord(args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
-    dataloader_dev = ASRDataLoader(args.dataset_dev, args, feat, label, batch_size=args.batch_size, num_loops=1)
+    batch_train = dataReader_train.fentch_batch_bucket()
+    dataloader_dev = ASRDataLoader(
+        args.dataset_dev,
+        args,
+        dataReader_dev.feat,
+        dataReader_dev.label,
+        batch_size=args.batch_size,
+        num_loops=1)
 
     tensor_global_step = tf.train.get_or_create_global_step()
 
@@ -78,11 +84,13 @@ def train():
     with tf.train.MonitoredTrainingSession(config=config) as sess:
         # for i in range(100):
         #     batch = sess.run(batch_train)
+        #     import pdb; pdb.set_trace()
         #     print(batch[0].shape)
+        _, labels, _, len_labels = sess.run(batch_train)
 
         if args.dirs.checkpoint:
-            checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
-            saver.restore(sess, checkpoint)
+            # checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
+            saver.restore(sess, args.dirs.checkpoint)
 
         elif args.dirs.lm_checkpoint:
             lm_checkpoint = tf.train.latest_checkpoint(args.dirs.lm_checkpoint)
@@ -95,21 +103,21 @@ def train():
         progress = 0
         while progress < args.num_epochs:
             global_step, lr = sess.run([tensor_global_step, model.learning_rate])
-            loss, shape_batch, _, _ = sess.run(model.list_run)
-
+            loss, shape_batch, _, debug = sess.run(model.list_run)
             num_processed += shape_batch[0]
             used_time = time()-batch_time
             batch_time = time()
             progress = num_processed/args.data.train_size
 
-            if global_step % 10 == 0:
-                logging.info('loss: {:.3f}\tbatch: {} lr:{:.6f} time:{:.2f}s {:.3f}% step: {}'.format(
-                              loss, shape_batch, lr, used_time, progress*100.0, global_step))
+            if global_step % 50 == 0:
+                print('loss: {:.3f}\tbatch: {} lr:{:.6f} time:{:.2f}s {:.3f}% step: {}'.format(
+                    loss, shape_batch, lr, used_time, progress*100.0, global_step))
                 summary.summary_scalar('loss', loss, global_step)
                 summary.summary_scalar('lr', lr, global_step)
 
             if global_step % args.save_step == args.save_step - 1:
                 saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step, write_meta_graph=True)
+                print('saved model in',  str(args.dir_checkpoint)+'/model-'+str(global_step))
 
             if global_step % args.dev_step == args.dev_step -1:
                 cer, wer = dev(
@@ -118,24 +126,20 @@ def train():
                     model=model_infer,
                     sess=sess,
                     unit=args.data.unit,
-                    idx2token=args.idx2token,
-                    eos_idx=args.eos_idx,
-                    min_idx=0,
-                    max_idx=args.dim_output-1)
+                    token2idx=args.token2idx,
+                    idx2token=args.idx2token)
                 summary.summary_scalar('dev_cer', cer, global_step)
                 summary.summary_scalar('dev_wer', wer, global_step)
 
             if global_step % args.decode_step == args.decode_step - 1:
                 decode_test(
                     step=global_step,
-                    sample=args.dataset_test[10],
+                    sample=args.dataset_test.uttid2sample(args.sample_uttid),
                     model=model_infer,
                     sess=sess,
                     unit=args.data.unit,
                     idx2token=args.idx2token,
-                    eos_idx=None,
-                    min_idx=0,
-                    max_idx=None)
+                    token2idx=args.token2idx)
 
     logging.info('training duration: {:.2f}h'.format((datetime.now()-start_time).total_seconds()/3600))
 
@@ -160,8 +164,7 @@ def infer():
     config.gpu_options.allow_growth = True
     config.log_device_placement = False
     with tf.train.MonitoredTrainingSession(config=config) as sess:
-        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
-        saver.restore(sess, checkpoint)
+        saver.restore(sess, args.dirs.checkpoint)
 
         total_cer_dist = 0
         total_cer_len = 0
@@ -175,9 +178,8 @@ def infer():
                              model_infer.list_pl[1]: np.array([len(sample['feature'])])}
                 sample_id, shape_batch, _ = sess.run(model_infer.list_run, feed_dict=dict_feed)
                 # decoded, sample_id, decoded_sparse = sess.run(model_infer.list_run, feed_dict=dict_feed)
-                res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, eos_idx=args.eos_idx, min_idx=0, max_idx=args.dim_output-1)
-                # align_txt = array2text(alignment[0], args.data.unit, args.idx2token, min_idx=0, max_idx=args.dim_output-1)
-                ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, eos_idx=args.eos_idx, min_idx=0, max_idx=args.dim_output-1)
+                res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, args.token2idx)
+                ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, args.token2idx)
 
                 list_res_char = list(res_txt)
                 list_ref_char = list(ref_txt)
@@ -187,6 +189,7 @@ def infer():
                 cer_len = len(list_ref_char)
                 wer_dist = ed.eval(list_res_word, list_ref_word)
                 wer_len = len(list_ref_word)
+                res_len = len(list_res_word)
                 total_cer_dist += cer_dist
                 total_cer_len += cer_len
                 total_wer_dist += wer_dist
@@ -196,8 +199,8 @@ def infer():
                     wer_len = 1000
                 if wer_dist/wer_len > 0:
                     fw.write('uttid:\t{} \nres:\t{}\nref:\t{}\n\n'.format(sample['uttid'], res_txt, ref_txt))
-                sys.stdout.write('\rcurrent cer: {:.3f}, wer: {:.3f};\tall cer {:.3f}, wer: {:.3f} {}/{} {:.2f}%'.format(
-                    cer_dist/cer_len, wer_dist/wer_len, total_cer_dist/total_cer_len,
+                sys.stdout.write('\rcurrent cer: {:.3f}, wer: {:.3f} res/ref: {:.3f};\tall cer {:.3f}, wer: {:.3f} {}/{} {:.2f}%'.format(
+                    cer_dist/cer_len, wer_dist/wer_len, res_len/wer_len, total_cer_dist/total_cer_len,
                     total_wer_dist/total_wer_len, i, len(dataset_dev), i/len(dataset_dev)*100))
                 sys.stdout.flush()
         logging.info('dev CER {:.3f}:  WER: {:.3f}'.format(total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
@@ -332,40 +335,17 @@ def save(gpu, name=0):
 
 
 if __name__ == '__main__':
-    from argparse import ArgumentParser
-
-    parser = ArgumentParser()
-    parser.add_argument('-m', type=str, dest='mode', default='train')
-    parser.add_argument('--name', type=str, dest='name', default=None)
-    parser.add_argument('--gpu', type=str, dest='gpu', default=0)
-    parser.add_argument('-c', type=str, dest='config')
-
-    param = parser.parse_args()
 
     print('CUDA_VISIBLE_DEVICES: ', args.gpus)
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
+    logging.info('enter the {} phrase'.format(args.mode))
 
-    if param.mode == 'infer':
-        logging.info('enter the INFERING phrase')
+    if args.mode == 'infer':
         infer()
-
-    elif param.mode == 'infer_lm':
-        logging.info('enter the INFERING phrase')
+    elif args.mode == 'infer_lm':
         infer_lm()
-
-    elif param.mode == 'save':
-        logging.info('enter the SAVING phrase')
-        save(gpu=param.gpu, name=param.name)
-
-    elif param.mode == 'train':
-        if param.name:
-            args.dir_exps = args.dir_exps / param.name
-            args.dir_log = args.dir_exps / 'log'
-            args.dir_checkpoint = args.dir_exps / 'checkpoint'
-            if not args.dir_exps.is_dir(): args.dir_exps.mkdir()
-            if not args.dir_log.is_dir(): args.dir_log.mkdir()
-            if not args.dir_checkpoint.is_dir(): args.dir_checkpoint.mkdir()
-        logging.info('enter the TRAINING phrase')
+    elif args.mode == 'save':
+        save(gpu=args.gpu, name=args.name)
+    elif args.mode == 'train':
         train()
 
         # python ../../main.py -m save --gpu 1 --name kin_asr -c configs/rna_char_big3.yaml

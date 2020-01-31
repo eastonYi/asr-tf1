@@ -7,7 +7,7 @@ def load_vocab(path, vocab_size=None):
     with open(path, encoding='utf8') as f:
         vocab = [line.strip().split()[0] for line in f]
     vocab = vocab[:vocab_size] if vocab_size else vocab
-    token2idx = defaultdict(lambda: 0)
+    token2idx = defaultdict(lambda: 1)
     idx2token = {}
     token2idx.update({token: idx for idx, token in enumerate(vocab)})
     idx2token.update({idx: token for idx, token in enumerate(vocab)})

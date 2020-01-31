@@ -1,0 +1,417 @@
+#!/usr/bin/env python
+from datetime import datetime
+from time import time
+import sys
+import logging
+import tensorflow as tf
+from pathlib import Path
+import numpy as np
+import editdistance as ed
+
+from utils.arguments import args
+from models.utils.tools import get_session, size_variables
+from models.utils.tfData import TFDataReader
+from utils.dataset import ASR_Multi_DataLoader, TextDataSet
+from utils.summaryTools import Summary
+from utils.textTools import array2text, batch_wer, batch_cer
+from utils.tools import get_batch_length
+
+
+def train():
+    print('reading data form ', args.dirs.train.tfdata)
+    dataReader_train = TFDataReader(args.dirs.train.tfdata, args=args)
+    batch_train = dataReader_train.fentch_multi_batch_bucket()
+
+    dataReader_dev = TFDataReader(args.dirs.dev.tfdata, args=args, _shuffle=False, transform=True)
+    dataloader_dev = ASR_Multi_DataLoader(
+        args.dataset_dev,
+        args,
+        dataReader_dev.feat,
+        dataReader_dev.phone,
+        dataReader_dev.label,
+        batch_size=args.batch_size,
+        num_loops=1)
+
+    tensor_global_step = tf.train.get_or_create_global_step()
+
+    G = args.Model(
+        tensor_global_step,
+        encoder=args.model.encoder.type,
+        decoder=args.model.decoder.type,
+        batch=batch_train,
+        training=True,
+        args=args)
+
+    G_infer = args.Model(
+        tensor_global_step,
+        encoder=args.model.encoder.type,
+        decoder=args.model.decoder.type,
+        training=False,
+        args=args)
+    vars = G.trainable_variables()
+    vars_spiker = G.trainable_variables(G.name+'/spiker')
+    # vars_G_ocd = G.trainable_variables('Ectc_Docd/ocd_decoder')
+
+    size_variables()
+
+    start_time = datetime.now()
+    saver = tf.train.Saver(vars, max_to_keep=30)
+    saver_S = tf.train.Saver(vars_spiker, max_to_keep=30)
+    summary = Summary(str(args.dir_log))
+    step_bias = 0
+
+    config = tf.ConfigProto()
+    config.allow_soft_placement = True
+    config.gpu_options.allow_growth = True
+    config.log_device_placement = False
+    with tf.train.MonitoredTrainingSession(config=config) as sess:
+        dataloader_dev.sess = sess
+        if args.dirs.checkpoint:
+            saver.restore(sess, args.dirs.checkpoint)
+            step_bias = int(args.dirs.checkpoint.split('-')[-1])
+        if args.dirs.checkpoint_S:
+            saver_S.restore(sess, args.dirs.checkpoint_G_en)
+
+        batch_time = time()
+        num_processed = 0
+        progress = 0
+        while progress < args.num_epochs:
+            # supervised training
+            global_step, lr = sess.run([tensor_global_step, G.learning_rate])
+            global_step += step_bias
+            loss_G, shape_batch, _, (ctc_loss, ce_loss, *_) = sess.run(G.list_run)
+            num_processed += shape_batch[0]
+            used_time = time()-batch_time
+            batch_time = time()
+            progress = num_processed/args.data.train_size
+
+            if global_step % 40 == 0:
+                print('ctc_loss: {:.2f}, ce_loss: {:.2f} batch: {} lr:{:.1e} {:.2f}s {:.3f}% step: {}'.format(
+                     np.mean(ctc_loss), np.mean(ce_loss), shape_batch, lr, used_time, progress*100, global_step))
+
+            if global_step % args.save_step == args.save_step - 1:
+                saver.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step)
+                print('saved S-C in',  str(args.dir_checkpoint)+'/model-'+str(global_step))
+                saver_S.save(get_session(sess), str(args.dir_checkpoint/'model_S'), global_step=global_step)
+                print('saved S in',  str(args.dir_checkpoint)+'/model_S-'+str(global_step))
+
+            if global_step % args.dev_step == args.dev_step - 1:
+            # if global_step % args.dev_step == 0:
+                per, cer, wer = dev(
+                    step=global_step,
+                    dataloader=dataloader_dev,
+                    model=G_infer,
+                    sess=sess,
+                    unit=args.data.unit,
+                    args=args)
+                summary.summary_scalar('dev_per', per, global_step)
+                summary.summary_scalar('dev_cer', cer, global_step)
+                summary.summary_scalar('dev_wer', wer, global_step)
+
+            if global_step % args.decode_step == args.decode_step - 1:
+            # if True:
+                decode_test(
+                    step=global_step,
+                    sample=args.dataset_test.uttid2sample(args.sample_uttid),
+                    model=G_infer,
+                    sess=sess,
+                    unit=args.data.unit,
+                    args=args)
+
+    logging.info('training duration: {:.2f}h'.format((datetime.now()-start_time).total_seconds()/3600))
+
+
+def train_gan():
+    print('reading data form ', args.dirs.train.tfdata)
+    dataReader_train = TFDataReader(args.dirs.train.tfdata, args=args)
+    batch_train = dataReader_train.fentch_multi_batch_bucket()
+    dataReader_untrain = TFDataReader(args.dirs.untrain.tfdata, args=args)
+    batch_untrain = dataReader_untrain.fentch_multi_batch(args.batch_size)
+    args.dirs.untrain.tfdata = Path(args.dirs.untrain.tfdata)
+    args.data.untrain_size = TFDataReader.read_tfdata_info(args.dirs.untrain.tfdata)['size_dataset']
+
+    dataset_text = TextDataSet(list_files=[args.dirs.text.data], args=args, _shuffle=True)
+    tfdata_train = tf.data.Dataset.from_generator(
+        dataset_text, (tf.int32), (tf.TensorShape([None])))
+    iter_text = tfdata_train.cache().repeat().shuffle(1000).\
+        padded_batch(args.text_batch_size, ([args.max_label_len])).prefetch(buffer_size=5).\
+        make_one_shot_iterator().get_next()
+    dataReader_dev = TFDataReader(args.dirs.dev.tfdata, args=args, _shuffle=False, transform=True)
+    dataloader_dev = ASR_Multi_DataLoader(
+        args.dataset_dev,
+        args,
+        dataReader_dev.feat,
+        dataReader_dev.phone,
+        dataReader_dev.label,
+        batch_size=args.batch_size,
+        num_loops=1)
+
+    tensor_global_step = tf.train.get_or_create_global_step()
+    tensor_global_step0 = tf.Variable(0, dtype=tf.int32, trainable=False)
+    tensor_global_step1 = tf.Variable(0, dtype=tf.int32, trainable=False)
+
+    G = args.Model(
+        tensor_global_step,
+        encoder=args.model.encoder.type,
+        decoder=args.model.decoder.type,
+        batch=batch_train,
+        training=True,
+        args=args)
+
+    G_infer = args.Model(
+        tensor_global_step,
+        encoder=args.model.encoder.type,
+        decoder=args.model.decoder.type,
+        training=False,
+        args=args)
+    vars_ASR = G.trainable_variables()
+    vars_spiker = G.trainable_variables(G.name+'/spiker')
+
+    D = args.Model_D(
+        tensor_global_step1,
+        training=True,
+        name='discriminator',
+        args=args)
+
+    gan = args.GAN([tensor_global_step0, tensor_global_step1], G, D,
+                   batch=batch_train, unbatch=batch_untrain, name='GAN', args=args)
+
+    size_variables()
+
+    start_time = datetime.now()
+    saver_ASR = tf.train.Saver(vars_ASR, max_to_keep=30)
+    saver = tf.train.Saver(max_to_keep=15)
+    summary = Summary(str(args.dir_log))
+    step_bias = 0
+
+    config = tf.ConfigProto()
+    config.allow_soft_placement = True
+    config.gpu_options.allow_growth = True
+    config.log_device_placement = False
+    with tf.train.MonitoredTrainingSession(config=config) as sess:
+        dataloader_dev.sess = sess
+        if args.dirs.checkpoint_G:
+            saver_ASR.restore(sess, args.dirs.checkpoint_G)
+
+        batch_time = time()
+        num_processed = 0
+        num_processed_unbatch = 0
+        progress = 0
+        while progress < args.num_epochs:
+
+            # semi_supervise
+            global_step, lr_G, lr_D = sess.run([tensor_global_step0, gan.learning_rate_G, gan.learning_rate_D])
+
+            for _ in range(2):
+                text = sess.run(iter_text)
+                text_lens = get_batch_length(text)
+                shape_text = text.shape
+                loss_D, loss_D_res, loss_D_text, loss_gp, _ = sess.run(gan.list_train_D,
+                                                          feed_dict={gan.list_pl[0]:text,
+                                                                     gan.list_pl[1]:text_lens})
+                # loss_D=loss_D_res=loss_D_text=loss_gp=0
+            (loss_G, ctc_loss, ce_loss, _), (shape_batch, shape_unbatch) = \
+                sess.run([gan.list_train_G, gan.list_feature_shape])
+
+            num_processed += shape_batch[0]
+            num_processed_unbatch += shape_unbatch[0]
+            used_time = time()-batch_time
+            batch_time = time()
+            progress = num_processed/args.data.train_size
+            progress_unbatch = num_processed_unbatch/args.data.untrain_size
+
+            if global_step % 40 == 0:
+                print('ctc|ce loss: {:.2f}|{:.2f}, loss res|real|gp: {:.2f}|{:.2f}|{:.2f}\t{}|{}\tlr:{:.1e}|{:.1e} {:.2f}s {:.3f}% step: {}'.format(
+                       np.mean(ctc_loss), np.mean(ce_loss), loss_D_res, loss_D_text, loss_gp, shape_batch, \
+                       shape_unbatch, lr_G, lr_D, used_time, progress*100, global_step))
+                summary.summary_scalar('ctc_loss', np.mean(ctc_loss), global_step)
+                summary.summary_scalar('ce_loss', np.mean(ce_loss), global_step)
+
+            if global_step % args.save_step == args.save_step - 1:
+                saver_ASR.save(get_session(sess), str(args.dir_checkpoint/'model'), global_step=global_step)
+                print('saved ASR model in',  str(args.dir_checkpoint)+'/model-'+str(global_step))
+
+            if global_step % args.dev_step == args.dev_step - 1:
+            # if True:
+                per, cer, wer = dev(
+                    step=global_step,
+                    dataloader=dataloader_dev,
+                    model=G_infer,
+                    sess=sess,
+                    unit=args.data.unit,
+                    args=args)
+                summary.summary_scalar('dev_per', per, global_step)
+                summary.summary_scalar('dev_cer', cer, global_step)
+                summary.summary_scalar('dev_wer', wer, global_step)
+
+            if global_step % args.decode_step == args.decode_step - 1:
+            # if True:
+                decode_test(
+                    step=global_step,
+                    sample=args.dataset_test.uttid2sample(args.sample_uttid),
+                    model=G_infer,
+                    sess=sess,
+                    unit=args.data.unit,
+                    args=args)
+
+    logging.info('training duration: {:.2f}h'.format((datetime.now()-start_time).total_seconds()/3600))
+
+
+def infer():
+    tensor_global_step = tf.train.get_or_create_global_step()
+
+    model_infer = args.Model(
+        tensor_global_step,
+        encoder=args.model.encoder.type,
+        decoder=args.model.decoder.type,
+        training=False,
+        args=args)
+
+    dataset_dev = args.dataset_test if args.dataset_test else args.dataset_dev
+
+    saver = tf.train.Saver(max_to_keep=40)
+    size_variables()
+
+    config = tf.ConfigProto()
+    config.allow_soft_placement = True
+    config.gpu_options.allow_growth = True
+    config.log_device_placement = False
+    with tf.train.MonitoredTrainingSession(config=config) as sess:
+        checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint_init)
+        saver.restore(sess, checkpoint)
+
+        total_cer_dist = 0
+        total_cer_len = 0
+        total_wer_dist = 0
+        total_wer_len = 0
+        with open(args.dir_model.name+'_decode.txt', 'w') as fw:
+            for i, sample in enumerate(dataset_dev):
+                if not sample:
+                    continue
+                dict_feed = {model_infer.list_pl[0]: np.expand_dims(sample['feature'], axis=0),
+                             model_infer.list_pl[1]: np.array([len(sample['feature'])])}
+                sample_id, shape_batch, _ = sess.run(model_infer.list_run, feed_dict=dict_feed)
+                # decoded, sample_id, decoded_sparse = sess.run(model_infer.list_run, feed_dict=dict_feed)
+                res_txt = array2text(sample_id[0], args.data.unit, args.idx2token, args.token2idx)
+                ref_txt = array2text(sample['label'], args.data.unit, args.idx2token, args.token2idx)
+
+                list_res_char = list(res_txt)
+                list_ref_char = list(ref_txt)
+                list_res_word = res_txt.split()
+                list_ref_word = ref_txt.split()
+                cer_dist = ed.eval(list_res_char, list_ref_char)
+                cer_len = len(list_ref_char)
+                wer_dist = ed.eval(list_res_word, list_ref_word)
+                wer_len = len(list_ref_word)
+                total_cer_dist += cer_dist
+                total_cer_len += cer_len
+                total_wer_dist += wer_dist
+                total_wer_len += wer_len
+                if cer_len == 0:
+                    cer_len = 1000
+                    wer_len = 1000
+                if wer_dist/wer_len > 0:
+                    fw.write('id:\t{} \nres:\t{}\nref:\t{}\n\n'.format(sample['id'], res_txt, ref_txt))
+                sys.stdout.write('\rcurrent cer: {:.3f}, wer: {:.3f};\tall cer {:.3f}, wer: {:.3f} {}/{} {:.2f}%'.format(
+                    cer_dist/cer_len, wer_dist/wer_len, total_cer_dist/total_cer_len,
+                    total_wer_dist/total_wer_len, i, len(dataset_dev), i/len(dataset_dev)*100))
+                sys.stdout.flush()
+        logging.info('dev CER {:.3f}:  WER: {:.3f}'.format(total_cer_dist/total_cer_len, total_wer_dist/total_wer_len))
+
+
+def dev(step, dataloader, model, sess, unit, args):
+    start_time = time()
+    batch_time = time()
+    processed = 0
+
+    total_cer_ctc_dist = 0
+    total_cer_dist = 0
+    total_cer_ctc_len = 0
+    total_cer_len = 0
+
+    total_wer_ctc_dist = 0
+    total_wer_dist = 0
+    total_wer_len = 0
+
+    for batch in dataloader:
+        if not batch: continue
+        dict_feed = {model.list_pl[0]: batch[0],
+                     model.list_pl[1]: batch[3]}
+        (decoded_ctc, decoded), shape_batch, _ = sess.run(model.list_run, feed_dict=dict_feed)
+
+        batch_cer_ctc_dist, batch_cer_ctc_len = batch_cer(
+            result=decoded_ctc,
+            reference=batch[1],
+            token2idx=args.phone2idx)
+        batch_cer_dist, batch_cer_len = batch_cer(
+            result=decoded,
+            reference=batch[2],
+            token2idx=args.token2idx)
+        _cer_ctc = batch_cer_ctc_dist/batch_cer_ctc_len
+        _cer = batch_cer_dist/batch_cer_len
+        total_cer_ctc_dist += batch_cer_ctc_dist
+        total_cer_dist += batch_cer_dist
+        total_cer_ctc_len += batch_cer_ctc_len
+        total_cer_len += batch_cer_len
+
+        batch_wer_ctc_dist, batch_wer_len = batch_wer(
+            result=decoded_ctc,
+            reference=batch[1],
+            idx2token=args.idx2phone,
+            token2idx=args.phone2idx,
+            unit=unit)
+        batch_wer_dist, batch_wer_len = batch_wer(
+            result=decoded,
+            reference=batch[2],
+            idx2token=args.idx2token,
+            token2idx=args.token2idx,
+            unit=unit)
+        _wer_ctc = batch_wer_ctc_dist/batch_wer_len
+        _wer = batch_wer_dist/batch_wer_len
+        total_wer_ctc_dist += batch_wer_ctc_dist
+        total_wer_dist += batch_wer_dist
+        total_wer_len += batch_wer_len
+
+        used_time = time()-batch_time
+        batch_time = time()
+        processed += shape_batch[0]
+        progress = processed/len(dataloader)
+        sys.stdout.write('\rbatch CTC per: {:.3f} \tbatch cer: {:.3f}\twer: {:.3f} batch: {}\t time:{:.2f}s {:.3f}%'.format(
+                      _cer_ctc, _cer, _wer, shape_batch, used_time, progress*100.0))
+        sys.stdout.flush()
+
+    used_time = time() - start_time
+    per = total_cer_ctc_dist/total_cer_ctc_len
+    cer = total_cer_dist/total_cer_len
+    wer = total_wer_dist/total_wer_len
+    logging.warning('\n=====dev info, total used time {:.2f}h==== \nPER: {:.4f}\tWER: {:.4f}\ntotal_wer_len: {}'.format(
+                 used_time/3600, per, wer, total_wer_len))
+
+    return per, cer, wer
+
+
+def decode_test(step, sample, model, sess, unit, args):
+    # sample = dataset_dev[0]
+    dict_feed = {model.list_pl[0]: np.expand_dims(sample['feature'], axis=0),
+                 model.list_pl[1]: np.array([len(sample['feature'])])}
+    (decoded_ctc, decoded), shape_sample, _ = sess.run(model.list_run, feed_dict=dict_feed)
+    res_ctc_txt = array2text(decoded_ctc[0], unit, args.idx2phone, args.phone2idx)
+    res_txt = array2text(decoded[0], unit, args.idx2token, args.token2idx)
+    ref_txt = array2text(sample['label'], unit, args.idx2token, args.token2idx)
+
+    logging.warning('length: {}, \nres_ctc: \n{}\nres: \n{}\nref: \n{}'.format(
+        shape_sample[1], res_ctc_txt, res_txt, ref_txt))
+
+
+if __name__ == '__main__':
+    if args.mode == 'infer':
+        logging.info('enter the INFERING phrase')
+        infer()
+    elif args.mode == 'train':
+        logging.info('enter the TRAINING phrase')
+        train()
+    elif args.mode == 'gan':
+        logging.info('enter the TRAINING phrase')
+        train_gan()
+
+        # python ../../main.py -m save --gpu 1 --name kin_asr -c configs/rna_char_big3.yaml

@@ -23,14 +23,12 @@ class LSTM_Model(object):
         self.batch = batch
         self.name = name
         self.build_input = self.build_tf_input if batch else self.build_pl_input
-
         self.list_pl = None
-
         self.global_step = tensor_global_step
 
         # Build graph
         self.list_run = list(self.build_graph() if training else self.build_infer_graph())
-        self.trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
+        # self.trainable_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
 
     def build_graph(self):
         # cerate input tensors in the cpu
@@ -47,11 +45,11 @@ class LSTM_Model(object):
         list_debug = []
 
         for id_gpu, name_gpu in enumerate(self.list_gpu_devices):
-            with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
-                loss, gradients, debug = self.build_single_graph(id_gpu, name_gpu, tensors_input)
-                loss_step.append(loss)
-                tower_grads.append(gradients)
-                list_debug.append(debug)
+            loss, gradients, debug = self.build_single_graph(
+                id_gpu, name_gpu, tensors_input)
+            loss_step.append(loss)
+            tower_grads.append(gradients)
+            list_debug.append(debug)
 
         # mean the loss
         loss = tf.reduce_mean(loss_step)
@@ -78,11 +76,11 @@ class LSTM_Model(object):
         # cerate input tensors in the cpu
         tensors_input = self.build_input()
 
-        with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
-            loss, logits = self.build_single_graph(
-                id_gpu=0,
-                name_gpu=self.list_gpu_devices[0],
-                tensors_input=tensors_input)
+        loss, logits = self.build_single_graph(
+            id_gpu=0,
+            name_gpu=self.list_gpu_devices[0],
+            tensors_input=tensors_input,
+            reuse=tf.AUTO_REUSE)
 
         # TODO: havn't checked
         infer = tf.nn.in_top_k(logits, tf.reshape(tensors_input.label_splits[0], [-1]), 1)

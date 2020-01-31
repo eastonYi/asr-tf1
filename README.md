@@ -1,13 +1,25 @@
-# Unsupervised phone classification
+# Speech Recognition
 
 ## Environments
 - Tensorflow == 1.14
 - Python == 3.7
 
+## vocab
+- unify the vocab of seq2seq and ctc:
+```
+<pad>
+<sos>
+<eos>
+...
+<blk>
+```
+- the id2token will replace these specical tokens with ``, and cut the sent at `<eos>`
+
 
 ## model code
 - `__call__`
 the forward compution of model and generate logits, which is then used in `build_single_graph` to compute loss and gradients.
+all the variavles in the model should be defined within
 
 - `build_single_graph`
 process input and call the self to build forward graph, then compute loss and gradients.

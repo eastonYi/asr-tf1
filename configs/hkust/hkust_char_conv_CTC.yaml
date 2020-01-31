@@ -1,0 +1,64 @@
+dirs:
+    exp: hksut
+    train:
+        scp: /mnt/lustre/xushuang2/easton/data/hkust/feats_3x.scp
+        trans: /mnt/lustre/xushuang2/easton/data/hkust/char.train_3x.scp
+        tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/train
+    dev:
+        scp: /mnt/lustre/xushuang2/easton/data/hkust/feats.dev.scp
+        trans: /mnt/lustre/xushuang2/easton/data/hkust/char.dev.scp
+        tfdata: /mnt/lustre/xushuang2/easton/data/hkust/tfdata/dev
+    test:
+        scp: /mnt/lustre/xushuang2/easton/data/hkust/feats.dev.scp
+        trans: /mnt/lustre/xushuang2/easton/data/hkust/char.dev.scp
+    type: scp
+    vocab: /mnt/lustre/xushuang2/easton/data/hkust/char_3673+1.vocab
+    # checkpoint: /data/sxu/easton/projects/EODM/exps/hksut/hkust_CTC/checkpoint
+
+data:
+    featType: mfcc
+    left_context: 0
+    right_context: 0
+    downsample: 1
+    add_delta: False
+    unit: word
+
+model:
+    type: ctcModel
+    confidence_penalty: 0.2
+    encoder:
+        type: conv2
+        num_filters: 128
+        dropout: 0.9
+    decoder:
+        type: FC
+        hidden_size: 512
+        num_fc: 2
+opti:
+    type: adam
+    lr: 0.0004
+
+dev_step: 200
+decode_step: 200
+save_step: 200
+num_epochs: 999
+
+optimizer: adam
+warmup_steps: 6000
+peak: 0.0002
+decay_steps: 8000
+
+gpus: '0,2,3'
+batch_size: 60
+text_batch_size: 200
+beam_size: 1
+num_supervised:
+num_batch_tokens: 40000
+bucket_boundaries: 172,231,278,321,364,407,457,518,604,766,2083
+seed: 8
+
+lambda_l2: 0.0
+grad_clip_value: 0.0
+slot_clip_value: 0.0
+grad_clip_norm: 0.0
+grad_clip_global_norm: 0.0

@@ -17,7 +17,7 @@ dirs:
         tfdata: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/tfdata/test-clean_xy_eos
     type: scp
     vocab: /mnt/lustre/xushuang2/easton/data/libriSpeech/subword_data/subword_3726.vocab
-    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer/test/checkpoint
+    # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/libri/libri_transformer_small/test/checkpoint
 
 data:
     featType: mfcc

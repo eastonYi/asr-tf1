@@ -1,0 +1,110 @@
+dirs:
+    exp: aishell
+    train:
+        scp: /home/easton/data/AISHELL/feats/feats.train-10k.scp
+        phone: /home/easton/data/AISHELL/phone/train-10k_rmsil.phone67
+        char: /home/easton/data/AISHELL/char/train-10k.char
+        tfdata: /home/easton/data/AISHELL/char/tfdata/train-10k_phone_char
+    untrain:
+        scp: /home/easton/data/AISHELL/feats/feats.train-120k.scp
+        phone: /home/easton/data/AISHELL/phone/train-120k_rmsil.phone67
+        char: /home/easton/data/AISHELL/char/train-120k.char
+        tfdata: /home/easton/data/AISHELL/char/tfdata/train-120k_phone_char
+    dev:
+        scp: /home/easton/data/AISHELL/feats/feats.dev-14k.scp
+        phone: /home/easton/data/AISHELL/phone/dev-14k_rmsil.phone67
+        char: /home/easton/data/AISHELL/char/dev-14k.char
+        tfdata: /home/easton/data/AISHELL/char/tfdata/dev-14k_phone_char
+    test:
+        scp: /home/easton/data/AISHELL/feats/feats.test-7k.scp
+        phone: /home/easton/data/AISHELL/phone/test-7k_rmsil.phone67
+        char: /home/easton/data/AISHELL/char/test-7k.char
+        tfdata: /home/easton/data/AISHELL/char/tfdata/test-7k_phone_char
+    text:
+        data: /home/easton/data/AISHELL/char/text.char
+    type: scp_multi
+    vocab_phone: /home/easton/data/AISHELL/phone/phones.vocab
+    vocab: /home/easton/data/AISHELL/char/char.vocab
+    # checkpoint_S: /home/easton/projects/asr-tf1/exps/aishell/Multi_conv/10k_merge1/checkpoint/model_S-3799
+    checkpoint_G: /home/easton/projects/asr-tf1/exps/aishell/Multi-2En_conv_conv-lstm/10k_conv_conv-lstm_conv/checkpoint/model-7999
+
+data:
+    featType: mfcc
+    left_context: 0
+    right_context: 0
+    downsample: 1
+    add_delta: False
+    unit: word
+    add_eos: False
+
+model:
+    type: Ectc_Docd_Multi_2En
+    dropout: 0.05
+    confidence_penalty: 0.2
+    encoder:
+        type: conv_1d
+        num_filters: 256
+        num_blocks: 2
+        add_ctc: True
+        merge_repeat: False
+        fixed: False
+    encoder2:
+        type: conv_lstm
+        hidden_size: 256
+        num_filters: 64
+    decoder:
+        # type: res_decoder
+        # num_blocks: 0
+        # num_filters: 256
+        # hidden_size: 256
+        # num_fc: 1
+        # label_smoothing: 0.95
+        # half: True
+        type: conv_decoder
+        num_blocks: 2
+        num_filters: 64
+        hidden_size: 256
+        left_splice: 1
+        right_splice: 1
+        num_fc: 1
+        label_smoothing: 0.95
+        half: True
+
+model_D:
+    type: clm
+    hidden_size: 256
+    num_blocks: 5
+    num_fc: 2
+
+gan_add_ctc_loss: False
+
+optimizer: adam
+# optimizer: RMSProp
+rate: 0.1
+lr_G: 0.0001
+lr_D: 0.0001
+warmup_steps: 2000
+peak: 0.001
+decay_steps: 4000
+
+dev_step: 200
+decode_step: 200
+save_step: 500
+num_epochs: 9999
+sample_uttid: BAC009S0764W0121
+
+gpus: '4,5'
+batch_size: 200
+beam_size: 1
+text_batch_size: 200
+max_feat_len: 1230
+max_label_len: 25
+num_batch_tokens: 80000
+# num_batch_tokens: 40000
+bucket_boundaries: 308,343,373,403,432,465,500,537,578,629,706,905,1231 # 10k
+
+lambda_lm: 0.0
+lambda_l2: 0.0
+grad_clip_value: 0.0
+grad_clip_norm: 0.0
+grad_clip_global_norm: 0.0

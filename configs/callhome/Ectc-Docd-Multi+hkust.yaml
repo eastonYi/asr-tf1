@@ -1,0 +1,106 @@
+dirs:
+    exp: callhome
+    train:
+        # scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust.scp
+        # phone: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust.phone
+        # char: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust.char
+        # tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train+hkust_phone_char
+        scp: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust1k.scp
+        phone: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust1k.phone
+        char: /home/easton/data/CALLHOME/Mandarin/train_dim80/train+hkust1k.char
+        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/train+hkust1k_phone_char
+    untrain:
+        scp: /home/easton/data/HKUST/HKUST_80/train/train.scp
+        phone: /home/easton/data/HKUST/HKUST_80/train/train_clean.phone
+        char: /home/easton/data/HKUST/HKUST_80/train/train_clean.char
+        tfdata: /home/easton/data/HKUST/HKUST_80/tfdata/train_phone_char
+    dev:
+        scp: /home/easton/data/CALLHOME/Mandarin/dev_dim80/dev.scp
+        phone: /home/easton/data/CALLHOME/Mandarin/dev_dim80/dev.phone
+        char: /home/easton/data/CALLHOME/Mandarin/dev_dim80/dev.char
+        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/dev_phone_char
+    test:
+        scp: /home/easton/data/CALLHOME/Mandarin/test_dim80/test.scp
+        phone: /home/easton/data/CALLHOME/Mandarin/test_dim80/test.phone
+        char: /home/easton/data/CALLHOME/Mandarin/test_dim80/test.char
+        tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/test_phone_char
+    text:
+        data: /home/easton/data/HKUST/HKUST_80/train/text.char
+    type: scp_multi
+    vocab_phone: /home/easton/data/CALLHOME/Mandarin/phones.vocab
+    vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
+    checkpoint_G: /home/easton/projects/asr-tf1/exps/callhome/Ectc-Docd-Multi+hkust/add_hkust1k_2encoder/checkpoint/model_G-8999
+    # checkpoint_G_en: /home/easton/projects/asr-tf1/exps/callhome/Ectc-Docd-Multi+hkust/sueprvised/checkpoint/model_G-43799
+
+data:
+    featType: mfcc
+    left_context: 0
+    right_context: 0
+    downsample: 1
+    add_delta: False
+    unit: word
+    add_eos: False
+
+model:
+    type: Ectc_Docd_Multi
+    dropout: 0.05
+    confidence_penalty: 0.3
+    merge_repeat: True
+    encoder:
+        type: conv2
+        num_filters: 256
+        num_blocks: 2
+    encoder2:
+        type: conv2
+        num_filters: 256
+        num_blocks: 2
+    decoder:
+        type: conv_decoder
+        num_blocks: 2
+        num_filters: 64
+        hidden_size: 256
+        num_fc: 2
+        label_smoothing: 0.95
+        left_splice: 0
+        right_splice: 0
+        half: True
+model_D:
+    type: clm
+    hidden_size: 256
+    num_blocks: 5
+    num_fc: 2
+
+# lr_type: constant_learning_rate
+optimizer: adam
+rate: 1.0
+lr_G: 0.0001
+lr_D: 0.0001
+lr: 0.00001
+warmup_steps: 2000
+peak: 0.001
+decay_steps: 3000
+# warmup_steps: 1000
+# peak: 0.0002
+# decay_steps: 1200
+
+dev_step: 200
+decode_step: 200
+save_step: 200
+num_epochs: 999
+sample_uttid: ma_0003-A-009398-009677
+gpus: '4,5'
+batch_size: 400
+beam_size: 1
+text_batch_size: 500
+max_feat_len: 1230
+max_label_len: 20
+# num_batch_tokens: 40000
+num_batch_tokens: 10000
+# bucket_boundaries: 129,191,238,279,317,355,395,437,488,553,650,854,3171,4036
+bucket_boundaries: 69,122,170,215,262,311,367,435,524,667,964,2209,4036
+
+lambda_lm: 0.0
+lambda_l2: 0.0
+grad_clip_value: 0.0
+grad_clip_norm: 0.0
+grad_clip_global_norm: 0.0

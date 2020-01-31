@@ -17,35 +17,48 @@ class CTCModel(Seq2SeqModel):
                  batch=None, name='CTC_Model'):
         super().__init__(tensor_global_step, encoder, decoder, training, args, batch, name)
 
-    def build_single_graph(self, id_gpu, name_gpu, tensors_input):
-        tf.get_variable_scope().set_initializer(tf.variance_scaling_initializer(
-            1.0, mode="fan_avg", distribution="uniform"))
-        with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
-            # create encoder obj
+    def __call__(self, feature, len_features, shrink=False, reuse=False):
+        with tf.variable_scope(self.name, reuse=reuse):
             encoder = self.gen_encoder(
                 training=self.training,
                 args=self.args)
             decoder = self.gen_decoder(
                 training=self.training,
-                embed_table=None,
                 global_step=self.global_step,
                 args=self.args)
 
-            # using encoder to encode the inout sequence
-            encoded, len_encoded = encoder(
-                tensors_input.feature_splits[id_gpu],
-                tensors_input.len_feat_splits[id_gpu])
-            logits, preds, len_decoded = decoder(encoded, len_encoded)
+            with tf.variable_scope(encoder.name or 'encoder'):
+                encoded, len_encoded = encoder(feature, len_features)
+
+            with tf.variable_scope(decoder.name or 'decoder'):
+                logits, align, len_logits = decoder(encoded, len_encoded, None, shrink)
+
+        return logits, align, len_logits
+
+    def build_single_graph(self, id_gpu, name_gpu, tensors_input, shrink=False, reuse=tf.AUTO_REUSE):
+        feature = tensors_input.feature_splits[id_gpu]
+        len_features = tensors_input.len_feat_splits[id_gpu]
+        labels = tensors_input.label_splits[id_gpu] if tensors_input.label_splits else None
+        len_labels = tensors_input.len_label_splits[id_gpu] if tensors_input.len_label_splits else None
+
+        with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
+            tf.get_variable_scope().set_initializer(tf.variance_scaling_initializer(
+                1.0, mode="fan_avg", distribution="uniform"))
+            logits, align, len_logits = self(
+                feature,
+                len_features,
+                shrink=shrink,
+                reuse=reuse)
 
             if self.training:
                 loss = self.ctc_loss(
                     logits=logits,
-                    len_logits=len_decoded,
-                    labels=tensors_input.label_splits[id_gpu],
-                    len_labels=tensors_input.len_label_splits[id_gpu])
+                    len_logits=len_logits,
+                    labels=labels,
+                    len_labels=len_labels)
 
                 if self.args.model.confidence_penalty:
-                    cp_loss = self.args.model.decoder.confidence_penalty * confidence_penalty(logits, len_decoded)
+                    cp_loss = self.args.model.confidence_penalty * confidence_penalty(logits, len_logits)
                     assert cp_loss.get_shape().ndims == 1
                     loss += cp_loss
 
@@ -59,11 +72,11 @@ class CTCModel(Seq2SeqModel):
             self.__class__.__name__, name_gpu, self.__class__.num_Model))
 
         if self.training:
-            return loss, gradients, [preds, tensors_input.label_splits[id_gpu]]
+            return loss, gradients, [align, labels]
         else:
-            return logits, len_decoded
+            return logits, align, len_logits
 
-    def ctc_loss(self, logits, len_logits, labels, len_labels):
+    def ctc_loss(self, logits, len_logits, labels, len_labels, merge_repeat=True):
         """
         No valid path found: It is possible that no valid path is found if the
         activations for the targets are zero.
@@ -75,7 +88,7 @@ class CTCModel(Seq2SeqModel):
             labels_sparse,
             logits,
             sequence_length=len_logits,
-            ctc_merge_repeated=True,
+            ctc_merge_repeated=merge_repeat,
             ignore_longer_outputs_than_inputs=True,
             time_major=False)
 
@@ -84,20 +97,20 @@ class CTCModel(Seq2SeqModel):
     def build_infer_graph(self):
         # cerate input tensors in the cpu
         tensors_input = self.build_infer_input()
-        with tf.variable_scope(self.name, reuse=bool(self.__class__.num_Model)):
-            logits, len_logits = self.build_single_graph(
-                id_gpu=0,
-                name_gpu=self.list_gpu_devices[0],
-                tensors_input=tensors_input)
+        logits, decoded, len_logits = self.build_single_graph(
+            id_gpu=0,
+            name_gpu=self.list_gpu_devices[0],
+            tensors_input=tensors_input,
+            shrink=True)
 
-            decoded_sparse = self.ctc_decode(logits, len_logits)
-            decoded = tf.sparse_to_dense(
-                sparse_indices=decoded_sparse.indices,
-                output_shape=decoded_sparse.dense_shape,
-                sparse_values=decoded_sparse.values,
-                default_value=0,
-                validate_indices=True)
-            distribution = tf.nn.softmax(logits)
+        # decoded_sparse = self.ctc_decode(logits, len_logits)
+        # decoded = tf.sparse_to_dense(
+        #     sparse_indices=decoded_sparse.indices,
+        #     output_shape=decoded_sparse.dense_shape,
+        #     sparse_values=decoded_sparse.values,
+        #     default_value=0,
+        #     validate_indices=True)
+        distribution = tf.nn.softmax(logits)
 
         return decoded, tensors_input.shape_batch, distribution
 

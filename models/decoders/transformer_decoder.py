@@ -24,7 +24,7 @@ class Transformer_Decoder(RNADecoder):
         self.lambda_lm = self.args.lambda_lm
         super().__init__(args, training, global_step, name)
 
-    def decode(self, encoded, len_encoded, decoder_input):
+    def __call__(self, encoded, len_encoded, decoder_input):
         # used for MLE training
         decoder_output = self.decoder_impl(encoded, len_encoded, decoder_input)
         logits = tf.layers.dense(
@@ -33,7 +33,7 @@ class Transformer_Decoder(RNADecoder):
             use_bias=False,
             name='decoder_fc')
 
-        preds = tf.to_int32(tf.argmax(logits, axis=-1))
+        preds = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
 
         return logits, preds, tf.no_op()
 

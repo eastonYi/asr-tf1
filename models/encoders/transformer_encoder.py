@@ -65,3 +65,66 @@ class Transformer_Encoder(Encoder):
         encoder_output *= tf.expand_dims(1.0 - tf.to_float(encoder_padding), axis=-1)
 
         return encoder_output, len_features
+
+
+class Transformer_Encoder_8x(Transformer_Encoder):
+
+    def encode(self, features, len_sequence):
+
+        encoder_output = tf.layers.dense(
+            inputs=features,
+            units=self.hidden_units,
+            activation=None,
+            use_bias=False,
+            name='encoder_fc')
+        encoder_output = tf.contrib.layers.layer_norm(
+            encoder_output, center=True, scale=True, trainable=True)
+
+        # Add positional signal
+        encoder_output = add_timing_signal_1d(encoder_output)
+        # Dropout
+        encoder_output = tf.layers.dropout(encoder_output,
+                                           rate=self.residual_dropout_rate,
+                                           training=self.training)
+        # Mask
+        encoder_padding = tf.equal(tf.sequence_mask(len_sequence, maxlen=tf.shape(features)[1]), False) # bool tensor
+        encoder_attention_bias = attention_bias_ignore_padding(encoder_padding)
+
+        # Blocks
+        for i in range(self.num_blocks):
+            with tf.variable_scope("block_{}".format(i)):
+                # Multihead Attention
+                encoder_output = residual(encoder_output,
+                                          multihead_attention(
+                                              query_antecedent=encoder_output,
+                                              memory_antecedent=None,
+                                              bias=encoder_attention_bias,
+                                              total_key_depth=self.hidden_units,
+                                              total_value_depth=self.hidden_units,
+                                              output_depth=self.hidden_units,
+                                              num_heads=self.num_heads,
+                                              dropout_rate=self.attention_dropout_rate,
+                                              name='encoder_self_attention',
+                                              summaries=False),
+                                          dropout_rate=self.residual_dropout_rate)
+
+                # Feed Forward
+                encoder_output = residual(encoder_output,
+                                          ff_hidden(
+                                              inputs=encoder_output,
+                                              hidden_size=4 * self.hidden_units,
+                                              output_size=self.hidden_units,
+                                              activation=self._ff_activation),
+                                          dropout_rate=self.residual_dropout_rate)
+
+                if i in (1,3,5):
+                    encoder_output = tf.layers.max_pooling1d(encoder_output, 2, 2, 'SAME')
+                    len_sequence = tf.cast(tf.math.ceil(tf.cast(len_sequence, tf.float32)/2), tf.int32)
+                    # Mask
+                    encoder_padding = tf.equal(tf.sequence_mask(len_sequence, maxlen=tf.shape(encoder_output)[1]), False)
+                    encoder_attention_bias = attention_bias_ignore_padding(encoder_padding)
+
+        # Mask padding part to zeros.
+        encoder_output *= tf.expand_dims(1.0 - tf.to_float(encoder_padding), axis=-1)
+
+        return encoder_output, len_sequence
