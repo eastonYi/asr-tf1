@@ -59,6 +59,7 @@ class Transformer(Seq2SeqModel):
                     logging.info('teacher-forcing training ...')
                     assert len_labels is not None
                     labels_sos = decoder.build_input(labels)
+
                     logits, preds, len_decoded = decoder(
                         encoded=encoded,
                         len_encoded=len_encoded,
@@ -67,10 +68,13 @@ class Transformer(Seq2SeqModel):
         return logits, preds, len_decoded
 
     def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
+        """
+        It worth moting that tensors_input.len_label_splits need to add 1 along with the sos padding
+        """
         feature = tensors_input.feature_splits[id_gpu]
         len_features = tensors_input.len_feat_splits[id_gpu]
         labels = tensors_input.label_splits[id_gpu] if tensors_input.label_splits else None
-        len_labels = tensors_input.len_label_splits[id_gpu] if tensors_input.len_label_splits else None
+        len_labels = tensors_input.len_label_splits[id_gpu]+1 if tensors_input.len_label_splits else None
 
         with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
 

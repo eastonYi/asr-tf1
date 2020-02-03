@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from datetime import datetime
 from time import time
-import os
 import sys
 import logging
 import tensorflow as tf
@@ -89,9 +88,7 @@ def train():
         _, labels, _, len_labels = sess.run(batch_train)
 
         if args.dirs.checkpoint:
-            # checkpoint = tf.train.latest_checkpoint(args.dirs.checkpoint)
             saver.restore(sess, args.dirs.checkpoint)
-
         elif args.dirs.lm_checkpoint:
             lm_checkpoint = tf.train.latest_checkpoint(args.dirs.lm_checkpoint)
             saver_lm.restore(sess, lm_checkpoint)
