@@ -38,6 +38,67 @@ class Transformer_Decoder(Decoder):
 
         return logits, preds, tf.no_op()
 
+    def decoder_impl(self, encoder_output, len_encoded, decoder_input):
+        # encoder_padding = tf.equal(tf.reduce_sum(tf.abs(encoder_output), axis=-1), 0.0)
+        encoder_padding = tf.equal(tf.sequence_mask(len_encoded, maxlen=tf.shape(encoder_output)[1]), False) # bool tensor
+        # [-0 -0 -0 -0 -0 -0 -0 -0 -0 -1e+09] the pading place is -1e+09
+        encoder_attention_bias = attention_bias_ignore_padding(encoder_padding)
+
+        decoder_output = self.embedding(decoder_input, self.embed_table)
+        # Positional Encoding
+        decoder_output += add_timing_signal_1d(decoder_output)
+        # Dropout
+        decoder_output = tf.layers.dropout(decoder_output,
+                                           rate=self.residual_dropout_rate,
+                                           training=self.training)
+        # Bias for preventing peeping later information
+        self_attention_bias = attention_bias_lower_triangle(tf.shape(decoder_input)[1])
+
+        # Blocks
+        for i in range(self.num_blocks):
+            with tf.variable_scope("block_{}".format(i)):
+                # Multihead Attention (self-attention)
+                decoder_output = residual(decoder_output,
+                                          multihead_attention(
+                                              query_antecedent=decoder_output,
+                                              memory_antecedent=None,
+                                              bias=self_attention_bias,
+                                              total_key_depth=self.num_cell_units,
+                                              total_value_depth=self.num_cell_units,
+                                              num_heads=self.num_heads,
+                                              dropout_rate=self.attention_dropout_rate,
+                                              output_depth=self.num_cell_units,
+                                              name="decoder_self_attention",
+                                              summaries=False),
+                                          dropout_rate=self.residual_dropout_rate)
+
+                # Multihead Attention (vanilla attention)
+                decoder_output = residual(decoder_output,
+                                          multihead_attention(
+                                              query_antecedent=decoder_output,
+                                              memory_antecedent=encoder_output,
+                                              bias=encoder_attention_bias,
+                                              # bias=None,
+                                              total_key_depth=self.num_cell_units,
+                                              total_value_depth=self.num_cell_units,
+                                              output_depth=self.num_cell_units,
+                                              num_heads=self.num_heads,
+                                              dropout_rate=self.attention_dropout_rate,
+                                              name="decoder_vanilla_attention",
+                                              summaries=False),
+                                          dropout_rate=self.residual_dropout_rate)
+
+                # Feed Forward
+                decoder_output = residual(decoder_output,
+                                          ff_hidden(
+                                              decoder_output,
+                                              hidden_size=4 * self.num_cell_units,
+                                              output_size=self.num_cell_units,
+                                              activation=self._ff_activation),
+                                          dropout_rate=self.residual_dropout_rate)
+
+        return decoder_output
+
     def decoder_with_caching(self, encoded, len_encoded):
         """
         gread search, used for self-learning training or infer
@@ -168,67 +229,6 @@ class Transformer_Decoder(Decoder):
 
         return decoder_output, new_cache
 
-    def decoder_impl(self, encoder_output, len_encoded, decoder_input):
-        # encoder_padding = tf.equal(tf.reduce_sum(tf.abs(encoder_output), axis=-1), 0.0)
-        encoder_padding = tf.equal(tf.sequence_mask(len_encoded, maxlen=tf.shape(encoder_output)[1]), False) # bool tensor
-        # [-0 -0 -0 -0 -0 -0 -0 -0 -0 -1e+09] the pading place is -1e+09
-        encoder_attention_bias = attention_bias_ignore_padding(encoder_padding)
-
-        decoder_output = self.embedding(decoder_input)
-        # Positional Encoding
-        decoder_output += add_timing_signal_1d(decoder_output)
-        # Dropout
-        decoder_output = tf.layers.dropout(decoder_output,
-                                           rate=self.residual_dropout_rate,
-                                           training=self.training)
-        # Bias for preventing peeping later information
-        self_attention_bias = attention_bias_lower_triangle(tf.shape(decoder_input)[1])
-
-        # Blocks
-        for i in range(self.num_blocks):
-            with tf.variable_scope("block_{}".format(i)):
-                # Multihead Attention (self-attention)
-                decoder_output = residual(decoder_output,
-                                          multihead_attention(
-                                              query_antecedent=decoder_output,
-                                              memory_antecedent=None,
-                                              bias=self_attention_bias,
-                                              total_key_depth=self.num_cell_units,
-                                              total_value_depth=self.num_cell_units,
-                                              num_heads=self.num_heads,
-                                              dropout_rate=self.attention_dropout_rate,
-                                              output_depth=self.num_cell_units,
-                                              name="decoder_self_attention",
-                                              summaries=False),
-                                          dropout_rate=self.residual_dropout_rate)
-
-                # Multihead Attention (vanilla attention)
-                decoder_output = residual(decoder_output,
-                                          multihead_attention(
-                                              query_antecedent=decoder_output,
-                                              memory_antecedent=encoder_output,
-                                              bias=encoder_attention_bias,
-                                              # bias=None,
-                                              total_key_depth=self.num_cell_units,
-                                              total_value_depth=self.num_cell_units,
-                                              output_depth=self.num_cell_units,
-                                              num_heads=self.num_heads,
-                                              dropout_rate=self.attention_dropout_rate,
-                                              name="decoder_vanilla_attention",
-                                              summaries=False),
-                                          dropout_rate=self.residual_dropout_rate)
-
-                # Feed Forward
-                decoder_output = residual(decoder_output,
-                                          ff_hidden(
-                                              decoder_output,
-                                              hidden_size=4 * self.num_cell_units,
-                                              output_size=self.num_cell_units,
-                                              activation=self._ff_activation),
-                                          dropout_rate=self.residual_dropout_rate)
-
-        return decoder_output
-
     def beam_decode_rerank(self, encoded, len_encoded):
         """
         beam search rerank at end with language model integration (self-attention model)
@@ -276,7 +276,7 @@ class Transformer_Decoder(Decoder):
             """
             the cache has no specific shape, so no can be put in the all_states
             """
-            preds_emb = self.embedding(preds)
+            preds_emb = self.embedding(preds, self.embed_table)
             decoder_input = preds_emb
 
             decoder_output, cache_decoder = self.decoder_with_caching_impl(
@@ -415,7 +415,7 @@ class Transformer_Decoder(Decoder):
         self.cell
         self.encoded
         """
-        prev_emb = self.embedding(preds[:, -1])
+        prev_emb = self.embedding(preds[:, -1], self.embed_table)
         decoder_input = tf.concat([self.encoded[:, i, :], prev_emb], axis=1)
         decoder_input.set_shape([None, self.num_cell_units_en+self.size_embedding])
 
