@@ -19,7 +19,7 @@ class Transformer_Decoder(Decoder):
         self.attention_dropout_rate = args.model.decoder.attention_dropout_rate if training else 0.0
         self.residual_dropout_rate = args.model.decoder.residual_dropout_rate if training else 0.0
         self.num_heads = args.model.decoder.num_heads
-        self.size_embedding = args.model.decoder.size_embedding
+        self.size_embedding = args.model.decoder.num_cell_units
         self._ff_activation = lambda x, y: x * tf.sigmoid(y)
         self.lambda_lm = self.args.lambda_lm
         self.embed_table = self.gen_embedding(self.args.dim_output, self.size_embedding)
