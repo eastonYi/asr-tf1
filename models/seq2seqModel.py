@@ -21,8 +21,7 @@ class Seq2SeqModel(LSTM_Model):
 
     def __init__(self, tensor_global_step, encoder, decoder, training, args,
                  batch=None, name='seq2seqModel'):
-        '''Model constructor
-
+        '''Model constructo
         Args:
         '''
         self.name = name
@@ -30,7 +29,6 @@ class Seq2SeqModel(LSTM_Model):
         self.training = training
         self.gen_encoder = encoder # encoder class
         self.gen_decoder = decoder # decoder class
-
         super().__init__(tensor_global_step, training, args, batch=batch, name=name)
 
     def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
@@ -41,7 +39,6 @@ class Seq2SeqModel(LSTM_Model):
                 args=self.args)
             decoder = self.gen_decoder(
                 training=self.training,
-                embed_table=self.embed_table,
                 global_step=self.global_step,
                 args=self.args)
 

@@ -31,21 +31,11 @@ class Decoder(object):
         self.args = args
         self.name = name
         self.training = training
-        self.start_token = args.token2idx['<sos>'] # tf.fill([self.batch_size], args.token2idx['<sos>'])
+        self.start_token = args.token2idx['<sos>']
         self.end_token = args.token2idx['<eos>']
         self.global_step = global_step
-        self.start_warmup_steps = self.args.model.decoder.start_warmup_steps
 
     def build_input(self, labels):
-        """
-        the decoder label input is tensors_input.labels left concat <sos>,
-        the lengths correspond add 1.
-        Create a tgt_input prefixed with <sos> and
-        PLEASE create a tgt_output suffixed with <eos> in the ce_loss.
-
-        we need to pass the tensors_input in to judge whether there is
-        tensors_input.label_splits
-        """
         assert self.start_token
         labels_sos = right_shift_rows(
             p=labels,
@@ -60,47 +50,31 @@ class Decoder(object):
         return logits
 
     def max_decoder_len(self, len_src=None):
-        if self.args.model.decoder.len_max_decoder:
-            len_max_decode = self.args.model.decoder.len_max_decoder
+        if self.args.model.decoder.max_decoded_len:
+            len_max_decode = self.args.model.decoder.max_decoded_len
         else:
             assert len_src
-            decoding_length_factor = 2.0
+            decoding_length_factor = 1.0
             len_max_decode = tf.to_int32(tf.round(
                 tf.to_float(len_src) * decoding_length_factor))
 
         return len_max_decode
 
-    def embedding(self, ids):
-        if self.embed_table:
-            embeded = tf.nn.embedding_lookup(self.embed_table, ids)
+    def embedding(self, ids, embed_table=None):
+        if embed_table is not None:
+            embeded = tf.nn.embedding_lookup(embed_table, ids)
         else:
             embeded = tf.one_hot(ids, self.args.dim_output, dtype=tf.float32)
 
         return embeded
 
-    @abstractmethod
-    def decode(self, encoded, len_encoded, labels, len_labels):
-        '''
-        Create the variables and do the forward computation to decode an entire
-        sequence
+    def gen_embedding(self, size_input, size_embedding):
+        with tf.device("/cpu:0"):
+            with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
+                embed_table = tf.get_variable(
+                    "embedding", [size_input, size_embedding], dtype=tf.float32)
 
-        Args:
-            encoded: the encoded inputs, this is a dictionary of
-                [batch_size x time x ...] tensors
-            encoded_seq_length: the sequence lengths of the encoded inputs
-                as a dictionary of [batch_size] vectors
-            targets: the targets used as decoder inputs as a dictionary of
-                [batch_size x time x ...] tensors
-            target_seq_length: the sequence lengths of the targets
-                as a dictionary of [batch_size] vectors
-
-        Returns:
-            - the output logits of the decoder as a dictionary of
-                [batch_size x time x ...] tensors
-            - the logit sequence_lengths as a dictionary of [batch_size] vectors
-            - the final state of the decoder as a possibly nested tupple
-                of [batch_size x ... ] tensors
-        '''
+        return embed_table
 
     @abstractmethod
     def zero_state(self, encoded_dim, batch_size):
@@ -125,19 +99,4 @@ class Decoder(object):
             tf.GraphKeys.GLOBAL_VARIABLES,
             scope=self.name + '/')
 
-        if hasattr(self, 'wrapped'):
-            #pylint: disable=E1101
-            variables += self.wrapped.variables
-
         return variables
-
-    @abstractmethod
-    def get_output_dims(self):
-        '''get the decoder output dimensions
-
-        args:
-            trainlabels: the number of extra labels the trainer needs
-
-        Returns:
-            a dictionary containing the output dimensions
-        '''

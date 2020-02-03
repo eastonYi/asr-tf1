@@ -11,7 +11,7 @@ import tensorflow as tf
 import logging
 
 from .seq2seqModel import Seq2SeqModel
-from .utils.tools import choose_device
+from .utils.tools import choose_device, get_tensor_len
 
 
 class Transformer(Seq2SeqModel):
@@ -74,7 +74,7 @@ class Transformer(Seq2SeqModel):
         feature = tensors_input.feature_splits[id_gpu]
         len_features = tensors_input.len_feat_splits[id_gpu]
         labels = tensors_input.label_splits[id_gpu] if tensors_input.label_splits else None
-        len_labels = tensors_input.len_label_splits[id_gpu]+1 if tensors_input.len_label_splits else None
+        len_labels = get_tensor_len(labels) if tensors_input.len_label_splits else None
 
         with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
 

@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from .rna_decoder import RNADecoder
+from .decoder import Decoder
 from ..utils.blocks import dense_without_vars
 from ..utils.attention import residual, multihead_attention, ff_hidden,\
     attention_bias_ignore_padding, add_timing_signal_1d, attention_bias_lower_triangle
@@ -8,7 +8,7 @@ from ..utils.attention import residual, multihead_attention, ff_hidden,\
 inf = 1e10
 
 
-class Transformer_Decoder(RNADecoder):
+class Transformer_Decoder(Decoder):
 
     def __init__(self, args, training, global_step, name='decoder'):
         self.name = name
@@ -22,6 +22,7 @@ class Transformer_Decoder(RNADecoder):
         self.size_embedding = args.model.decoder.size_embedding
         self._ff_activation = lambda x, y: x * tf.sigmoid(y)
         self.lambda_lm = self.args.lambda_lm
+        self.embed_table = self.gen_embedding(self.dim_output, self.size_embedding)
         super().__init__(args, training, global_step, name)
 
     def __call__(self, encoded, len_encoded, decoder_input):
@@ -43,7 +44,7 @@ class Transformer_Decoder(RNADecoder):
         """
         batch_size = tf.shape(encoded)[0]
         token_init = tf.fill([batch_size, 1], self.start_token)
-        logits_init = tf.zeros([batch_size, 1, self.dim_output], dtype=tf.float32)
+        logits_init = tf.zeros([batch_size, 0, self.dim_output], dtype=tf.float32)
         finished_init = tf.zeros([batch_size], dtype=tf.bool)
         len_decoded_init = tf.ones([batch_size], dtype=tf.int32)
         cache_decoder_init = tf.zeros([batch_size, 0, self.num_blocks, self.num_cell_units])
@@ -52,8 +53,7 @@ class Transformer_Decoder(RNADecoder):
 
         def step(i, preds, cache_decoder, logits, len_decoded, finished):
 
-            preds_emb = self.embedding(preds)
-            decoder_input = preds_emb
+            decoder_input = self.embedding(preds, self.embed_table)
 
             decoder_output, cache_decoder = self.decoder_with_caching_impl(
                 decoder_input,
@@ -99,9 +99,8 @@ class Transformer_Decoder(RNADecoder):
                               tf.TensorShape([None]),
                               tf.TensorShape([None])]
             )
-        # len_decoded = tf.Print(len_decoded, [finished], message='finished: ', summarize=1000)
         len_decoded -= 1-tf.to_int32(finished) # for decoded length cut by encoded length
-        logits = logits[:, 1:, :]
+        # logits = logits[:, 1:, :]
         preds = preds[:, 1:]
         not_padding = tf.sequence_mask(len_decoded, dtype=tf.int32)
         preds = tf.multiply(tf.to_int32(preds), not_padding)

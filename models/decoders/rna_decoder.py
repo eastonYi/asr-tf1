@@ -5,7 +5,6 @@ import tensorflow as tf
 from .decoder import Decoder
 from ..utils.blocks import make_multi_cell
 from tensorflow.python.util import nest
-import logging
 
 inf = 1e10
 
@@ -14,15 +13,15 @@ class RNADecoder(Decoder):
     """language model cold fusion
     """
 
-    def __init__(self, args, is_train, global_step, name=None):
+    def __init__(self, args, training, global_step, name='RNADecoder'):
         self.num_layers = args.model.decoder.num_layers
         self.num_cell_units_de = args.model.decoder.hidden_size
         self.num_cell_units_en = args.model.encoder.hidden_size
         self.size_embedding = args.model.decoder.size_embedding
         self.dropout = args.model.dropout
         self.dim_output = args.dim_output
-        self.embed_table = self.get_embedding(self.dim_output, self.size_embedding)
-        super().__init__(args, is_train, global_step, name)
+        self.embed_table = self.gen_embedding(self.dim_output, self.size_embedding)
+        super().__init__(args, training, global_step, name)
 
     def __call__(self, encoded, len_encoded, decoder_input):
         batch_size = tf.shape(len_encoded)[0]
@@ -37,7 +36,7 @@ class RNADecoder(Decoder):
 
         def step(i, preds, all_states, logits):
             state_decoder = all_states["state_decoder"]
-            prev_emb = self.embedding(preds[:, -1])
+            prev_emb = self.embedding(preds[:, -1], self.embed_table)
             decoder_input = tf.concat([encoded[:, i, :], prev_emb], axis=1)
             decoder_input.set_shape([None, self.size_embedding + self.num_cell_units_en])
 
@@ -58,7 +57,7 @@ class RNADecoder(Decoder):
                     name='fully_connected'
                     )
 
-            if self.is_train and self.args.model.decoder.sample_decoder:
+            if self.training and self.args.model.decoder.sample_decoder:
                 cur_ids = tf.distributions.Categorical(logits=cur_logit/self.softmax_temperature).sample()
             else:
                 cur_ids = tf.to_int32(tf.argmax(cur_logit, -1))
@@ -87,7 +86,7 @@ class RNADecoder(Decoder):
     def create_cell(self):
         cell = make_multi_cell(
             self.num_cell_units_de,
-            self.is_train,
+            self.training,
             1-self.dropout,
             self.num_layers,
             rnn_mode='BLOCK')
@@ -96,17 +95,3 @@ class RNADecoder(Decoder):
 
     def zero_state(self, batch_size, dtype):
         return self.cell.zero_state(batch_size, dtype)
-
-    def get_embedding(self, size_input, size_embedding):
-        '''
-        if embed_table is not none, return it; else we will create a trainable one
-        '''
-        if size_embedding:
-            with tf.device("/cpu:0"):
-                with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
-                    embed_table = tf.get_variable(
-                        "embedding", [size_input, size_embedding], dtype=tf.float32)
-        else:
-            embed_table = None
-
-        return embed_table
