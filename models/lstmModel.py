@@ -192,13 +192,6 @@ class LSTM_Model(object):
     def build_optimizer(self):
         if self.args.lr_type == 'constant_learning_rate':
             self.learning_rate = tf.convert_to_tensor(self.args.lr)
-        elif self.args.lr_type == 'exponential_decay':
-            self.learning_rate = exponential_decay(
-                self.global_step,
-                lr_init=self.args.lr_init,
-                lr_final=self.args.lr_final,
-                decay_rate=self.args.decay_rate,
-                decay_steps=self.args.decay_steps)
         else:
             self.learning_rate = warmup_exponential_decay(
                 self.global_step,
@@ -206,11 +199,6 @@ class LSTM_Model(object):
                 peak=self.args.peak,
                 decay_rate=0.5,
                 decay_steps=self.args.decay_steps)
-
-        if 'horovod' in sys.modules:
-            import horovod.tensorflow as hvd
-            logging.info('wrap the optimizer with horovod!')
-            self.learning_rate = self.learning_rate * hvd.size()
 
         with tf.name_scope("optimizer"):
             if self.args.optimizer == "adam":

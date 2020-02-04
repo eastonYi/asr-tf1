@@ -77,6 +77,8 @@ args.dirs.test.tfdata = Path(args.dirs.test.tfdata)
 args.dirs.train.feat_len = args.dirs.train.tfdata/'feature_length.txt'
 args.dirs.dev.feat_len = args.dirs.dev.tfdata/'feature_length.txt'
 
+assert args.sample_uttid
+
 if args.dirs.type == 'scp':
     from .dataset import ASR_scp_DataSet
     dataset_train = ASR_scp_DataSet(

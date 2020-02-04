@@ -22,7 +22,7 @@ class Transformer_Decoder(Decoder):
         self.size_embedding = args.model.decoder.num_cell_units
         self._ff_activation = lambda x, y: x * tf.sigmoid(y)
         self.lambda_lm = self.args.lambda_lm
-        self.embed_table = self.gen_embedding(self.args.dim_output, self.size_embedding)
+        self.embed_table = self.gen_embedding(self.dim_output, self.size_embedding)
         super().__init__(args, training, global_step, name)
 
     def __call__(self, encoded, len_encoded, decoder_input):
@@ -30,7 +30,7 @@ class Transformer_Decoder(Decoder):
         decoder_output = self.decoder_impl(encoded, len_encoded, decoder_input)
         logits = tf.layers.dense(
             decoder_output,
-            self.args.dim_output,
+            self.dim_output,
             use_bias=False,
             name='decoder_fc')
 

@@ -34,6 +34,7 @@ class Decoder(object):
         self.start_token = args.token2idx['<sos>']
         self.end_token = args.token2idx['<eos>']
         self.global_step = global_step
+        self.dim_output = self.args.dim_output
 
     def build_input(self, labels):
         assert self.start_token

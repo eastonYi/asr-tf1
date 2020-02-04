@@ -12,7 +12,7 @@ import logging
 from collections import namedtuple
 
 from .lstmModel import LSTM_Model
-from .utils.tools import choose_device, smoothing_cross_entropy
+from .utils.tools import choose_device, smoothing_cross_entropy, get_tensor_len
 
 
 class Seq2SeqModel(LSTM_Model):
@@ -31,9 +31,8 @@ class Seq2SeqModel(LSTM_Model):
         self.gen_decoder = decoder # decoder class
         super().__init__(tensor_global_step, training, args, batch=batch, name=name)
 
-    def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
-
-        with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
+    def __call__(self, feature, len_features, labels=None, len_labels=None, reuse=False):
+        with tf.variable_scope(self.name, reuse=reuse):
             encoder = self.gen_encoder(
                 training=self.training,
                 args=self.args)
@@ -42,33 +41,51 @@ class Seq2SeqModel(LSTM_Model):
                 global_step=self.global_step,
                 args=self.args)
 
-            encoded, len_encoded = encoder(
-                features=tensors_input.feature_splits[id_gpu],
-                len_features=tensors_input.len_feat_splits[id_gpu])
+            with tf.variable_scope(encoder.name or 'encoder'):
+                encoded, len_encoded = encoder(feature, len_features)
 
-            decoder_input = decoder.build_input(
-                id_gpu=id_gpu,
-                tensors_input=tensors_input)
-            # if in the infer, the decoder_input.input_labels and len_labels are None
-            logits, preds, len_decoded = decoder(encoded, len_encoded, decoder_input.input_labels)
+            with tf.variable_scope(decoder.name or 'decoder'):
+                labels_sos = decoder.build_input(labels)
+                logits, preds, len_decoded = decoder(encoded, len_encoded, labels_sos)
+
+        return logits, preds, len_decoded
+
+    def build_single_graph(self, id_gpu, name_gpu, tensors_input, reuse=tf.AUTO_REUSE):
+        """
+        It worth noting that tensors_input.len_label_splits need to add 1 along with the sos padding
+        """
+        feature = tensors_input.feature_splits[id_gpu]
+        len_features = tensors_input.len_feat_splits[id_gpu]
+        labels = tensors_input.label_splits[id_gpu] if tensors_input.label_splits else None
+        len_labels = get_tensor_len(labels) if tensors_input.len_label_splits else None
+
+        with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
+
+            logits, preds, len_decoded = self(
+                feature,
+                len_features,
+                labels,
+                len_labels,
+                reuse=reuse)
 
             if self.training:
                 loss = self.ce_loss(
                     logits=logits,
-                    labels=decoder_input.output_labels[:, :tf.shape(logits)[1]],
-                    len_labels=decoder_input.len_labels)
+                    labels=labels[:, :tf.shape(logits)[1]],
+                    len_labels=len_labels)
 
                 with tf.name_scope("gradients"):
                     assert loss.get_shape().ndims == 1
                     loss = tf.reduce_mean(loss)
-                    gradients = self.optimizer.compute_gradients(loss)
+                    gradients = self.optimizer.compute_gradients(loss, var_list=self.trainable_variables())
 
         self.__class__.num_Model += 1
         logging.info('\tbuild {} on {} succesfully! total model number: {}'.format(
             self.__class__.__name__, name_gpu, self.__class__.num_Model))
 
         if self.training:
-            return loss, gradients, [len_decoded, preds, tensors_input.label_splits[id_gpu]]
+            # no_op is preserved for debug info to pass
+            return loss, gradients, [preds, tensors_input.label_splits[id_gpu]]
         else:
             return logits, len_decoded, preds
 
