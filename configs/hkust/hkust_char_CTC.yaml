@@ -1,22 +1,22 @@
 dirs:
     exp: hkust
     train:
-        scp: /home/easton/data/HKUST/HKUST_80/train/feats.scp
-        trans: /home/easton/data/HKUST/HKUST_80/train/train_clean.char
-        tfdata: /home/easton/data/HKUST/HKUST_80/tfdata/train_char
+        scp: /home/easton/data/HKUST/HKUST_120/train/feats.scp
+        trans: /home/easton/data/HKUST/HKUST_120/train/train_clean.char
+        tfdata: /home/easton/data/HKUST/HKUST_120/tfdata/train_char
     dev:
-        scp: /home/easton/data/HKUST/HKUST_80/dev/feats.scp
-        trans: /home/easton/data/HKUST/HKUST_80/dev/dev.char
-        tfdata: /home/easton/data/HKUST/HKUST_80/tfdata/dev_char
+        scp: /home/easton/data/HKUST/HKUST_120/dev/feats.scp
+        trans: /home/easton/data/HKUST/HKUST_120/dev/dev.char
+        tfdata: /home/easton/data/HKUST/HKUST_120/tfdata/dev_char
     test:
-        scp: /home/easton/data/HKUST/HKUST_80/dev/feats.scp
-        trans: /home/easton/data/HKUST/HKUST_80/dev/dev.char
-        tfdata: /home/easton/data/HKUST/HKUST_80/tfdata/dev_char
+        scp: /home/easton/data/HKUST/HKUST_120/dev/feats.scp
+        trans: /home/easton/data/HKUST/HKUST_120/dev/dev.char
+        tfdata: /home/easton/data/HKUST/HKUST_120/tfdata/dev_char
     text:
-        data: /home/easton/data/HKUST/HKUST_80/train/text.char
+        data: /home/easton/data/HKUST/HKUST_120/train/text.char
     type: scp
-    # vocab: /home/easton/data/HKUST/HKUST_80/char.vocab
-    vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
+    vocab: /home/easton/data/HKUST/HKUST_120/char.vocab
+    # vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
     # checkpoint: /data/sxu/easton/projects/EODM/exps/hksut/hkust_CTC/checkpoint
 
 data:

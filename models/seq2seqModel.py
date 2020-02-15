@@ -14,7 +14,8 @@ SOS_IDX = 2
 class Seq2SeqModel(object):
     '''a general class for an encoder decoder system
     '''
-
+    num_Instances = 0
+    num_Model = 0
     def __init__(self, tensor_global_step, encoder, decoder, training, args,
                  batch=None, name='seq2seqModel'):
         '''Model constructo
