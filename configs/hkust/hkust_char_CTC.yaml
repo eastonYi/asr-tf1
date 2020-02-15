@@ -2,16 +2,16 @@ dirs:
     exp: hkust
     train:
         scp: /home/easton/data/HKUST/HKUST_120/train/feats.scp
-        trans: /home/easton/data/HKUST/HKUST_120/train/train_clean.char
+        trans: /home/easton/data/HKUST/HKUST_120/train/trans.char
         tfdata: /home/easton/data/HKUST/HKUST_120/tfdata/train_char
     dev:
         scp: /home/easton/data/HKUST/HKUST_120/dev/feats.scp
-        trans: /home/easton/data/HKUST/HKUST_120/dev/dev.char
+        trans: /home/easton/data/HKUST/HKUST_120/dev/trans.char
         tfdata: /home/easton/data/HKUST/HKUST_120/tfdata/dev_char
     test:
-        scp: /home/easton/data/HKUST/HKUST_120/dev/feats.scp
-        trans: /home/easton/data/HKUST/HKUST_120/dev/dev.char
-        tfdata: /home/easton/data/HKUST/HKUST_120/tfdata/dev_char
+        scp: /home/easton/data/HKUST/HKUST_120/test/feats.scp
+        trans: /home/easton/data/HKUST/HKUST_120/test/trans.char
+        tfdata: /home/easton/data/HKUST/HKUST_120/tfdata/test_char
     text:
         data: /home/easton/data/HKUST/HKUST_120/train/text.char
     type: scp
@@ -52,6 +52,7 @@ optimizer: adam
 warmup_steps: 6000
 peak: 0.0002
 decay_steps: 8000
+sample_uttid: 20040503_222707_A000687_B000688-A-002472-003202
 
 gpus: '4,5,6,7'
 batch_size: 60
