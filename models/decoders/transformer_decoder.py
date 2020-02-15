@@ -6,7 +6,8 @@ from ..utils.attention import residual, multihead_attention, ff_hidden,\
     attention_bias_ignore_padding, add_timing_signal_1d, attention_bias_lower_triangle
 
 inf = 1e10
-
+SOS_IDX = 2
+EOS_IDX = 3
 
 class Transformer_Decoder(Decoder):
 
@@ -104,7 +105,7 @@ class Transformer_Decoder(Decoder):
         gread search, used for self-learning training or infer
         """
         batch_size = tf.shape(encoded)[0]
-        token_init = tf.fill([batch_size, 1], self.start_token)
+        token_init = tf.fill([batch_size, 1], SOS_IDX)
         logits_init = tf.zeros([batch_size, 0, self.dim_output], dtype=tf.float32)
         finished_init = tf.zeros([batch_size], dtype=tf.bool)
         len_decoded_init = tf.ones([batch_size], dtype=tf.int32)
@@ -134,7 +135,7 @@ class Transformer_Decoder(Decoder):
             logits = tf.concat([logits, cur_logit[:, None]], 1)
 
             # Whether sequences finished.
-            has_eos = tf.equal(cur_ids, self.end_token)
+            has_eos = tf.equal(cur_ids, EOS_IDX)
             finished = tf.logical_or(finished, has_eos)
             len_decoded += 1-tf.to_int32(finished)
 
@@ -336,7 +337,7 @@ class Transformer_Decoder(Decoder):
             cache_decoder = tf.gather(cache_decoder, indices=k_indices // beam_size)
             preds = tf.concat([preds, next_preds[:, None]], axis=1)  # [batch_size * beam_size, i]
 
-            has_eos = tf.equal(next_preds, self.end_token)
+            has_eos = tf.equal(next_preds, EOS_IDX)
             finished = tf.logical_or(finished, has_eos)
             len_decoded += 1-tf.to_int32(finished)
             # i = tf.Print(i, [i], message='i: ', summarize=1000)
