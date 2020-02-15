@@ -1,7 +1,6 @@
 #!/usr/bin/env
 # coding=utf-8
 import tensorflow as tf
-import numpy as np
 import logging
 import os
 from tqdm import tqdm
@@ -115,7 +114,7 @@ class TFDataReader:
 
         if transform:
             feature = process_raw_feature(feature, self.args)
-        if self.args.add_eos:
+        if self.args.data.add_eos:
             label = tf.concat([label, [EOS_IDX]], 0)
 
         self.feat = feature
