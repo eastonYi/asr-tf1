@@ -10,8 +10,8 @@ so, there is only infer and training
 import tensorflow as tf
 import logging
 
-from .seq2seqModel import Seq2SeqModel
-
+from .seq2seqModel import Seq2SeqModel, SOS_IDX
+from .utils.tools import right_shift_rows
 
 class Transformer(Seq2SeqModel):
     '''a general class for an encoder decoder system
@@ -55,8 +55,10 @@ class Transformer(Seq2SeqModel):
                             len_encoded)
                 else:
                     logging.info('teacher-forcing training ...')
-                    assert len_labels is not None
-                    labels_sos = decoder.build_input(labels)
+                    labels_sos = right_shift_rows(
+                        p=labels,
+                        shift=1,
+                        pad=SOS_IDX)
 
                     logits, preds, len_decoded = decoder(
                         encoded=encoded,
