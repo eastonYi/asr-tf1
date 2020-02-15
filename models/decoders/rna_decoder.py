@@ -20,8 +20,8 @@ class RNADecoder(Decoder):
         self.size_embedding = args.model.decoder.size_embedding
         self.dropout = args.model.dropout
         self.dim_output = args.dim_output
-        self.embed_table = self.gen_embedding(self.dim_output, self.size_embedding)
         super().__init__(args, training, global_step, name)
+        self.embed_table = self.gen_embedding(self.dim_output, self.size_embedding)
 
     def __call__(self, encoded, len_encoded, decoder_input):
         batch_size = tf.shape(len_encoded)[0]

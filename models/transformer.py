@@ -11,7 +11,6 @@ import tensorflow as tf
 import logging
 
 from .seq2seqModel import Seq2SeqModel
-from .utils.tools import choose_device, get_tensor_len
 
 
 class Transformer(Seq2SeqModel):
@@ -21,13 +20,12 @@ class Transformer(Seq2SeqModel):
     def __init__(self, tensor_global_step, encoder, decoder, training, args,\
                  batch=None, name='transformer'):
         '''Model constructor
-
         Args:
         '''
         self.name = name
         self.args = args
         self.training = training
-        super().__init__(tensor_global_step, encoder, decoder, training, \
+        super().__init__(tensor_global_step, encoder, decoder, training,\
                          args, batch, name=name)
 
     def __call__(self, feature, len_features, labels=None, len_labels=None, reuse=False):

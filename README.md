@@ -8,12 +8,14 @@
 - unify the vocab of seq2seq and ctc:
 ```
 <pad>
+<unk>
 <sos>
 <eos>
 ...
 <blk>
 ```
 - the id2token will replace these specical tokens with ``, and cut the sent at `<eos>`
+- add '<eos>' when reading tfdata if add_eos is True.
 
 
 ## model code

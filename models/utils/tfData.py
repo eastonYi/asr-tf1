@@ -12,6 +12,7 @@ from multiprocessing import Process, Queue
 from .tfAudioTools import splice, down_sample, add_delt
 from utils.tools import mkdirs
 
+EOS_IDX = 3
 
 def _bytes_feature(value):
     """Returns a bytes_list from a list of string / byte."""
@@ -114,8 +115,8 @@ class TFDataReader:
 
         if transform:
             feature = process_raw_feature(feature, self.args)
-        if self.args.data.add_eos:
-            label = tf.concat([label, [self.args.eos_idx]], 0)
+        if self.args.add_eos:
+            label = tf.concat([label, [EOS_IDX]], 0)
 
         self.feat = feature
         self.label = label
@@ -133,6 +134,23 @@ class TFDataReader:
             dynamic_pad=True,
             allow_smaller_final_batch=True
         )
+        seq_len_feats = tf.reshape(list_outputs[2], [-1])
+        seq_len_label = tf.reshape(list_outputs[3], [-1])
+
+        return list_outputs[0], list_outputs[1], seq_len_feats, seq_len_label
+
+    def fentch_batch_bucket(self):
+        list_inputs = [self.feat, self.label, tf.shape(self.feat)[0], tf.shape(self.label)[0]]
+        _, list_outputs = tf.contrib.training.bucket_by_sequence_length(
+            input_length=list_inputs[2],
+            tensors=list_inputs,
+            batch_size=self.list_batch_size,
+            bucket_boundaries=self.list_bucket_boundaries,
+            num_threads=8,
+            bucket_capacities=[i*2 for i in self.list_batch_size],
+            capacity=30,  # size of the top queue
+            dynamic_pad=True,
+            allow_smaller_final_batch=True)
         seq_len_feats = tf.reshape(list_outputs[2], [-1])
         seq_len_label = tf.reshape(list_outputs[3], [-1])
 
@@ -173,49 +191,6 @@ class TFDataReader:
 
         return list_outputs[0], list_outputs[1], list_outputs[2], seq_len_feats, seq_len_phone, seq_len_label
 
-    def fentch_batch_bucket(self):
-        list_inputs = [self.feat, self.label, tf.shape(self.feat)[0], tf.shape(self.label)[0]]
-        _, list_outputs = tf.contrib.training.bucket_by_sequence_length(
-            input_length=list_inputs[2],
-            tensors=list_inputs,
-            batch_size=self.list_batch_size,
-            bucket_boundaries=self.list_bucket_boundaries,
-            num_threads=8,
-            bucket_capacities=[i*2 for i in self.list_batch_size],
-            capacity=30,  # size of the top queue
-            dynamic_pad=True,
-            allow_smaller_final_batch=True)
-        seq_len_feats = tf.reshape(list_outputs[2], [-1])
-        seq_len_label = tf.reshape(list_outputs[3], [-1])
-
-        return list_outputs[0], list_outputs[1], seq_len_feats, seq_len_label
-
-    def fentch_multi_label_batch_bucket(self):
-        """
-        the input tensor length is not equal,
-        so will add the len as a input tensor
-        list_inputs: [tensor1, tensor2]
-        added_list_inputs: [tensor1, tensor2, len_tensor1, len_tensor2]
-        """
-        list_inputs = [self.feat, self.phone, self.label,
-                       tf.shape(self.feat)[0], tf.shape(self.phone)[0], tf.shape(self.label)[0]]
-        _, list_outputs = tf.contrib.training.bucket_by_sequence_length(
-            input_length=tf.shape(self.feat)[0],
-            tensors=list_inputs,
-            batch_size=self.args.list_batch_size,
-            bucket_boundaries=self.args.list_bucket_boundaries,
-            num_threads=8,
-            bucket_capacities=[i*3 for i in self.args.list_batch_size],
-            capacity=2000,
-            dynamic_pad=True,
-            allow_smaller_final_batch=True)
-        seq_len_feats = tf.reshape(list_outputs[3], [-1])
-        seq_len_phone = tf.reshape(list_outputs[4], [-1])
-        seq_len_label = tf.reshape(list_outputs[5], [-1])
-
-        return list_outputs[0], list_outputs[1], list_outputs[2],\
-                seq_len_feats, seq_len_phone, seq_len_label
-
 
 class TFDataSaver:
     """
@@ -228,7 +203,6 @@ class TFDataSaver:
         mkdirs(self.dir_save)
         self.args = args
         self.save_multilabel = args.dirs.vocab_phone
-        self.add_eos = args.data.add_eos
         self.size_file = size_file
         self.dim_feature = dataset[0]['feature'].shape[-1]
 
@@ -342,7 +316,6 @@ class TFDataSaver:
 
 if __name__ == '__main__':
     # from configs.arguments import args
-    from tqdm import tqdm
     import sys
 
     logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format='%(levelname)s(%(filename)s:%(lineno)d): %(message)s')

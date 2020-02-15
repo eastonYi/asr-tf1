@@ -93,29 +93,6 @@ def array2text(res, unit, idx2token, token2idx):
     return list_res_txt
 
 
-def normalize_text(original, remove_apostrophe=True):
-    """
-    Given a Python string ``original``, remove unsupported characters.
-    The only supported characters are letters and apostrophes"'".
-    """
-    # convert any unicode characters to ASCII equivalent
-    # then ignore anything else and decode to a string
-    result = unicodedata.normalize("NFKD", original).encode("ascii", "ignore").decode()
-    if remove_apostrophe:
-        # remove apostrophes to keep contractions together
-        result = result.replace("'", "")
-    # return lowercase alphabetic characters and apostrophes (if still present)
-    return re.sub("[^a-zA-Z']+", ' ', result).strip().lower()
-
-
-def normalize_txt_file(txt_file, remove_apostrophe=True):
-    """
-    Given a path to a text file, return contents with unsupported characters removed.
-    """
-    with codecs.open(txt_file, encoding="utf-8") as f:
-        return normalize_text(f.read(), remove_apostrophe)
-
-
 def array_idx2char(array_idx, idx2token, seperator=''):
     # array_idx = np.asarray(array_idx, dtype=np.int32)
     if len(array_idx)==0 or np.isscalar(array_idx[0]):

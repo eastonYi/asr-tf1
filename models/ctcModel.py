@@ -41,7 +41,7 @@ class CTCModel(Seq2SeqModel):
         labels = tensors_input.label_splits[id_gpu] if tensors_input.label_splits else None
         len_labels = tensors_input.len_label_splits[id_gpu] if tensors_input.len_label_splits else None
 
-        with tf.device(lambda op: choose_device(op, name_gpu, self.center_device)):
+        with tf.device(lambda op: choose_device(op, name_gpu, "/cpu:0")):
             tf.get_variable_scope().set_initializer(tf.variance_scaling_initializer(
                 1.0, mode="fan_avg", distribution="uniform"))
             logits, align, len_logits = self(
@@ -58,7 +58,8 @@ class CTCModel(Seq2SeqModel):
                     len_labels=len_labels)
 
                 if self.args.model.confidence_penalty:
-                    cp_loss = self.args.model.confidence_penalty * confidence_penalty(logits, len_logits)
+                    cp_loss = self.args.model.confidence_penalty * \
+                        confidence_penalty(logits, len_logits)
                     assert cp_loss.get_shape().ndims == 1
                     loss += cp_loss
 
@@ -102,32 +103,6 @@ class CTCModel(Seq2SeqModel):
             name_gpu=self.list_gpu_devices[0],
             tensors_input=tensors_input,
             shrink=True)
-
-        # decoded_sparse = self.ctc_decode(logits, len_logits)
-        # decoded = tf.sparse_to_dense(
-        #     sparse_indices=decoded_sparse.indices,
-        #     output_shape=decoded_sparse.dense_shape,
-        #     sparse_values=decoded_sparse.values,
-        #     default_value=0,
-        #     validate_indices=True)
         distribution = tf.nn.softmax(logits)
 
         return decoded, tensors_input.shape_batch, distribution
-
-    def ctc_decode(self, logits, len_logits):
-        beam_size = self.args.beam_size
-        logits_timeMajor = tf.transpose(logits, [1, 0, 2])
-
-        if beam_size == 1:
-            decoded_sparse = tf.to_int32(tf.nn.ctc_greedy_decoder(
-                logits_timeMajor,
-                len_logits,
-                merge_repeated=True)[0][0])
-        else:
-            decoded_sparse = tf.to_int32(tf.nn.ctc_beam_search_decoder(
-                logits_timeMajor,
-                len_logits,
-                beam_width=beam_size,
-                merge_repeated=True)[0][0])
-
-        return decoded_sparse

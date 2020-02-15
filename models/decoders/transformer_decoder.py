@@ -22,8 +22,8 @@ class Transformer_Decoder(Decoder):
         self.size_embedding = args.model.decoder.num_cell_units
         self._ff_activation = lambda x, y: x * tf.sigmoid(y)
         self.lambda_lm = self.args.lambda_lm
-        self.embed_table = self.gen_embedding(self.dim_output, self.size_embedding)
         super().__init__(args, training, global_step, name)
+        self.embed_table = self.gen_embedding(self.dim_output, self.size_embedding)
 
     def __call__(self, encoded, len_encoded, decoder_input):
         # used for MLE training

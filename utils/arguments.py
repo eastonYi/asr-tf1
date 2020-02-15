@@ -38,7 +38,6 @@ assert args.num_batch_tokens
 args.list_batch_size = ([int(args.num_batch_tokens / boundary) * args.num_gpus
         for boundary in (args.list_bucket_boundaries)] + [args.num_gpus])
 args.batch_size *= args.num_gpus
-args.text_batch_size *= args.num_gpus
 logging.info('\nbucket_boundaries: {} \nbatch_size: {}'.format(
     args.list_bucket_boundaries, args.list_batch_size))
 
@@ -122,44 +121,9 @@ elif args.dirs.type == 'scp_multi':
         args=args,
         _shuffle=False,
         transform=True)
-elif args.dirs.type == 'csv':
-    from .dataset import ASR_csv_DataSet
-    dataset_train = ASR_csv_DataSet(
-        f_csv=args.dirs.train.wav_csv,
-        args=args,
-        _shuffle=True,
-        transform=False)
-    dataset_dev = ASR_csv_DataSet(
-        f_csv=args.dirs.dev.wav_csv,
-        args=args,
-        _shuffle=False,
-        transform=False)
-    dataset_test = ASR_csv_DataSet(
-        f_csv=args.dirs.test.wav_csv,
-        args=args,
-        _shuffle=False,
-        transform=True)
-elif args.dirs.type == 'scp_classify':
-    from .dataset import ASR_classify_ArkDataSet
-    dataset_train = ASR_classify_ArkDataSet(
-        scp_file=args.dirs.train.scp,
-        class_file=args.dirs.train.label,
-        args=args,
-        _shuffle=True)
-    dataset_dev = ASR_classify_ArkDataSet(
-        scp_file=args.dirs.dev.scp,
-        class_file=args.dirs.dev.label,
-        args=args,
-        _shuffle=False)
-    dataset_test = ASR_classify_ArkDataSet(
-        scp_file=args.dirs.test.scp,
-        class_file=args.dirs.test.label,
-        args=args,
-        _shuffle=False)
-elif args.dirs.type == 'test':
+else :
     dataset_dev = dataset_train = dataset_test = None
-else:
-    raise NotImplementedError('not dataset type!')
+
 args.dataset_dev = dataset_dev
 args.dataset_train = dataset_train
 args.dataset_test = dataset_test
@@ -178,22 +142,14 @@ except:
 ## encoder
 if args.model.encoder.type == 'transformer_encoder':
     from models.encoders.transformer_encoder import Transformer_Encoder as encoder
-elif args.model.encoder.type == 'transformer_encoder_8x':
-    from models.encoders.transformer_encoder import Transformer_Encoder_8x as encoder
 elif args.model.encoder.type == 'conv_lstm':
     from models.encoders.conv_lstm import CONV_LSTM as encoder
-elif args.model.encoder.type == 'conv_lstm_4x':
-    from models.encoders.conv_lstm import CONV_LSTM_4x as encoder
-elif args.model.encoder.type == 'classifier':
-    from models.encoders.classifier import CONV_LSTM_Classifier as encoder
-elif args.model.encoder.type == 'blsrm':
+elif args.model.encoder.type == 'blstm':
     from models.encoders.blstm import BLSTM as encoder
 elif args.model.encoder.type == 'conv_1d':
     from models.encoders.conv import CONV_1D as encoder
 elif args.model.encoder.type == 'conv_2d':
     from models.encoders.conv import CONV_2D as encoder
-elif args.model.encoder.type == 'conv_1d_rnn':
-    from models.encoders.conv import CONV_1D_with_RNN as encoder
 else:
     raise NotImplementedError('not found encoder type: {}'.format(args.model.encoder.type))
 args.model.encoder.type = encoder
@@ -203,12 +159,6 @@ if args.model.decoder.type == 'FC':
     from models.decoders.fc_decoder import FCDecoder as decoder
 elif args.model.decoder.type == 'conv_decoder':
     from models.decoders.conv_decoder import CONV_Decoder as decoder
-elif args.model.decoder.type == 'res_decoder':
-    from models.decoders.conv_decoder import ResConv_Decoder as decoder
-elif args.model.decoder.type == 'rnn':
-    from models.decoders.rnn_decoder import RNN_Decoder as decoder
-elif args.model.decoder.type == 'classifier':
-    from models.decoders.classifier import FCDecoder as decoder
 elif args.model.decoder.type == 'transformer_decoder':
     from models.decoders.transformer_decoder import Transformer_Decoder as decoder
 else:
@@ -220,8 +170,6 @@ if args.model.type == 'Seq2SeqModel':
     from models.seq2seqModel import Seq2SeqModel as Model
 elif args.model.type == 'ctcModel':
     from models.ctcModel import CTCModel as Model
-elif args.model.type == 'ctcModel_EODM':
-    from models.ctcModel_EODM import CTCModel as Model
 elif args.model.type == 'Ectc_Docd':
     from models.Ectc_Docd import Ectc_Docd as Model
 elif args.model.type == 'Ectc_Docd_Multi':
@@ -246,10 +194,6 @@ elif args.model.type == 'Ectc_Docd_Multi_2En':
         raise NotImplementedError('not found encoder type: {}'.format(args.model.encoder2.type))
     args.model.encoder2.type = encoder
 
-elif args.model.type == 'ctc_ce':
-    from models.CTC_CE import CTC_CE as Model
-elif args.model.type == 'classifier':
-    from models.classifier import Classifier as Model
 elif args.model.type == 'transformer':
     from models.transformer import Transformer as Model
 else:
@@ -257,12 +201,9 @@ else:
 
 args.Model = Model
 
-
 if args.model_D:
     if args.model_D.type == 'clm':
         from models.discriminator.clm import CLM as Model_D
-    elif args.model_D.type == 'rnn':
-        from models.discriminator.clm import RNN_CLM as Model_D
     else:
         raise NotImplementedError('not found Model type!')
     args.Model_D = Model_D

@@ -5,8 +5,6 @@ from abc import ABCMeta, abstractmethod
 import tensorflow as tf
 from collections import namedtuple
 
-from ..utils.tools import right_shift_rows
-
 
 class Decoder(object):
     '''a general decoder for an encoder decoder system
@@ -31,19 +29,8 @@ class Decoder(object):
         self.args = args
         self.name = name
         self.training = training
-        self.start_token = args.token2idx['<sos>']
-        self.end_token = args.token2idx['<eos>']
         self.global_step = global_step
         self.dim_output = self.args.dim_output
-
-    def build_input(self, labels):
-        assert self.start_token
-        labels_sos = right_shift_rows(
-            p=labels,
-            shift=1,
-            pad=self.start_token)
-
-        return labels_sos
 
     def teacher_forcing(self, encoded, len_encoded, target_labels, max_len):
         with tf.variable_scope(self.name or 'decoder'):
