@@ -25,6 +25,7 @@ data:
     right_context: 0
     downsample: 1
     add_delta: False
+    num_feat_map: 3
     unit: word
     add_eos: False
 

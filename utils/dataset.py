@@ -71,7 +71,7 @@ class ASR_scp_DataSet(ASRDataSet):
 
         try:
             sample['uttid'] = uttid = self.list_uttids[idx]
-            
+
             trans = self.dict_trans[uttid]
             sample['label'] = np.array(
                 [self.token2idx.get(token, self.token2idx['<unk>'])
@@ -86,7 +86,7 @@ class ASR_scp_DataSet(ASRDataSet):
             print('Not found {}!'.format(self.list_uttids[idx]))
             sample = None
         except AssertionError:
-            print('{} label is None!'.format(self.list_uttids[idx]))
+            # print('{} label is None!'.format(self.list_uttids[idx]))
             sample = None
 
         return sample
