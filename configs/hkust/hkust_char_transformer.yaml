@@ -21,9 +21,9 @@ dirs:
 
 data:
     featType: mfcc
-    left_context: 0
-    right_context: 0
-    downsample: 1
+    left_context: 2
+    right_context: 1
+    downsample: 4
     add_delta: False
     unit: word
     add_eos: True
@@ -57,6 +57,7 @@ dev_step: 200
 decode_step: 200
 save_step: 200
 num_epochs: 999
+sample_uttid: 20040503_222707_A000687_B000688-A-002472-003202
 
 optimizer: adam
 warmup_steps: 6000
