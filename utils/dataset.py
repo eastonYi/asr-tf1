@@ -71,17 +71,22 @@ class ASR_scp_DataSet(ASRDataSet):
 
         try:
             sample['uttid'] = uttid = self.list_uttids[idx]
-            sample['feature'] = self.reader.read_utt_data(uttid)
-            if self.transform:
-                sample['feature'] = process_raw_feature(sample['feature'], self.args)
-
+            
             trans = self.dict_trans[uttid]
             sample['label'] = np.array(
                 [self.token2idx.get(token, self.token2idx['<unk>'])
                 for token in trans],
                 dtype=np.int32)
+            assert len(trans) > 0
+
+            sample['feature'] = self.reader.read_utt_data(uttid)
+            if self.transform:
+                sample['feature'] = process_raw_feature(sample['feature'], self.args)
         except KeyError:
             print('Not found {}!'.format(self.list_uttids[idx]))
+            sample = None
+        except AssertionError:
+            print('{} label is None!'.format(self.list_uttids[idx]))
             sample = None
 
         return sample
