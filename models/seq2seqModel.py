@@ -313,7 +313,7 @@ class Seq2SeqModel(object):
         '''
         scope = scope if scope else self.name
         scope += '/'
-        logging.info('all the variables in the scope:', scope)
+        logging.info('all the variables in the scope: {}'.format(scope))
         variables = tf.get_collection(
             tf.GraphKeys.TRAINABLE_VARIABLES,
             scope=scope)
