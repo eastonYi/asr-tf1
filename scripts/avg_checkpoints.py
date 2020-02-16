@@ -19,6 +19,8 @@
 import numpy as np
 import six
 from six.moves import zip  # pylint: disable=redefined-builtin
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ''
 import tensorflow as tf
 
 flags = tf.flags
