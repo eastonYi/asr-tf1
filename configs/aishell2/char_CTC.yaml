@@ -1,0 +1,75 @@
+dirs:
+    exp: hkust
+    train:
+        scp: /data3/easton/data/AISHELL-2/fbank_data/train/feats.scp
+        trans: /data3/easton/data/AISHELL-2/fbank_data/train/trans.char
+        tfdata: /data3/easton/data/AISHELL-2/fbank_data/tfdata/train_char
+    dev:
+        scp: /data3/easton/data/AISHELL-2/fbank_data/dev/feats.scp
+        trans: /data3/easton/data/AISHELL-2/fbank_data/dev/trans.char
+        tfdata: /data3/easton/data/AISHELL-2/fbank_data/tfdata/dev_char
+    test:
+        scp: /data3/easton/data/AISHELL-2/fbank_data/test/feats.scp
+        trans: /data3/easton/data/AISHELL-2/fbank_data/test/trans.char
+        tfdata: /data3/easton/data/AISHELL-2/fbank_data/tfdata/test_char
+    demo:
+        scp: /data3/easton/data/AISHELL-2/fbank_data/demo/feats.scp
+        trans: /data3/easton/data/AISHELL-2/fbank_data/demo/trans.char
+        tfdata: /data3/easton/data/AISHELL-2/fbank_data/tfdata/demo
+    text:
+        data: /data3/easton/data/AISHELL-2/fbank_data/train/text.char
+    type: scp
+    vocab: /data3/easton/data/AISHELL-2/fbank_data/char.vocab
+    # vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
+    # checkpoint: /data/sxu/easton/projects/EODM/exps/hksut/hkust_CTC/checkpoint
+
+data:
+    featType: mfcc
+    left_context: 0
+    right_context: 0
+    downsample: 1
+    add_delta: False
+    num_feat_map: 3
+    unit: char
+    add_eos: False
+
+model:
+    type: ctcModel
+    confidence_penalty: 0.2
+    encoder:
+        type: conv_lstm
+        hidden_size: 1024
+        num_filters: 64
+        dropout: 0.9
+    decoder:
+        type: FC
+        num_fc: 0
+opti:
+    type: adam
+    lr: 0.0004
+
+dev_step: 200
+decode_step: 200
+save_step: 200
+num_epochs: 999
+
+optimizer: adam
+warmup_steps: 6000
+peak: 0.0002
+decay_steps: 8000
+sample_uttid: 20040503_222707_A000687_B000688-A-002472-003202
+
+gpus: '4,5,6,7'
+batch_size: 60
+text_batch_size: 200
+beam_size: 1
+num_supervised:
+num_batch_tokens: 40000
+bucket_boundaries: 172,231,278,321,364,407,457,518,604,766,2083
+seed: 8
+
+lambda_l2: 0.0
+grad_clip_value: 0.0
+slot_clip_value: 0.0
+grad_clip_norm: 0.0
+grad_clip_global_norm: 0.0
