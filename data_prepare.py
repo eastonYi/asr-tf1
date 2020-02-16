@@ -49,7 +49,7 @@ def check():
         _shuffle=False,
         transform=True)
     dataLoader = ASRDataLoader(
-        dataReader,
+        dataset,
         args,
         dataReader.feat,
         dataReader.label,
@@ -63,6 +63,13 @@ def check():
         args=args,
         _shuffle=False,
         transform=True)
+    
+    dataset_2 = ASR_scp_DataSet(
+        f_scp=args.dirs.demo.scp,
+        f_trans=args.dirs.demo.trans,
+        args=args,
+        _shuffle=False,
+        transform=False)
 
     config = tf.ConfigProto()
     config.allow_soft_placement = True
@@ -82,5 +89,5 @@ if __name__ == '__main__':
     import os
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-#     main()
-    check()
+    main()
+#     check()

@@ -12,6 +12,10 @@ dirs:
         scp: /home/easton/data/HKUST/HKUST_120/test/feats.scp
         trans: /home/easton/data/HKUST/HKUST_120/test/trans.char
         tfdata: /home/easton/data/HKUST/HKUST_120/tfdata/test_char
+    demo:
+        scp: /home/easton/data/HKUST/HKUST_120/demo/feats.scp
+        trans: /home/easton/data/HKUST/HKUST_120/demo/trans.char
+        tfdata: /home/easton/data/HKUST/HKUST_120/tfdata/demo
     text:
         data: /home/easton/data/HKUST/HKUST_120/train/text.char
     type: scp
