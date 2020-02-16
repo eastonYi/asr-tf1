@@ -89,7 +89,7 @@ class ASR_scp_DataSet(ASRDataSet):
             for line in f:
                 try:
                     uttid, trans = line.strip().split(maxsplit=1)
-                    dict_trans[uttid] = trans
+                    dict_trans[uttid] = trans.split()
                 except ValueError:
                     pass
 
