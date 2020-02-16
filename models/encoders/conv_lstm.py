@@ -2,31 +2,28 @@ import tensorflow as tf
 import numpy as np
 from .encoder import Encoder
 from ..utils.blocks import conv_lstm
-from ..utils.attention import residual, layer_norm
+from ..utils.attention import layer_norm
 
 
 class CONV_LSTM(Encoder):
-    '''VERY DEEP CONVOLUTIONAL NETWORKS FOR END-TO-END SPEECH RECOGNITION
-    '''
 
-    def encode(self, features, len_features):
+    def __init__(self, args, training, name='conv_lstm'):
+        self.hidden_size = args.model.encoder.hidden_size
+        self.num_filters = args.model.encoder.num_filters
+        self.feature_map = self.args.data.num_feat_map
+        super().__init__(args, training, name)
 
-        hidden_size = self.args.model.encoder.hidden_size
-        num_filters = self.args.model.encoder.num_filters
-        size_feat = self.args.data.dim_input
+    def __call__(self, features, len_features):
 
         size_batch  = tf.shape(features)[0]
         size_length = tf.shape(features)[1]
-        len_feats = tf.reduce_sum(tf.cast(tf.reduce_sum(tf.abs(features), -1) > 0, tf.int32), -1)
-
-        feature_map = self.args.data.num_feat_map
-        size_feat = int(size_feat/feature_map)
-        x = tf.reshape(features, [size_batch, size_length, size_feat, feature_map])
+        size_feat = int(self.args.data.dim_input / self.feature_map)
+        x = tf.reshape(features, [size_batch, size_length, size_feat, self.feature_map])
 
         # the first cnn layer
         x = self.normal_conv(
             inputs=x,
-            filter_num=num_filters,
+            filter_num=self.num_filters,
             kernel=(3,3),
             stride=(2,2),
             padding='SAME',
@@ -36,11 +33,11 @@ class CONV_LSTM(Encoder):
         x = conv_lstm(
             x=x,
             kernel_size=(3,3),
-            filters=num_filters)
+            filters=self.num_filters)
 
-        size_feat = int(np.ceil(size_feat/2))*num_filters
-        size_length  = tf.cast(tf.math.ceil(tf.cast(size_length,tf.float32)/2), tf.int32)
-        len_seq = tf.cast(tf.math.ceil(tf.cast(len_feats, tf.float32)/2), tf.int32)
+        size_feat = int(np.ceil(size_feat/2)) * self.num_filters
+        size_length  = tf.cast(tf.math.ceil(tf.cast(size_length, tf.float32)/2), tf.int32)
+        len_seq = tf.cast(tf.math.ceil(tf.cast(len_features, tf.float32)/2), tf.int32)
         x = tf.reshape(x, [size_batch, size_length, size_feat])
 
         outputs = x
@@ -48,33 +45,33 @@ class CONV_LSTM(Encoder):
         outputs = self.blstm(
             hidden_output=outputs,
             len_feas=len_seq,
-            hidden_size=hidden_size,
+            hidden_size=self.hidden_size,
             name='blstm_1')
         outputs, len_seq = self.pooling(outputs, len_seq, 'HALF', 1)
 
         outputs = self.blstm(
             hidden_output=outputs,
             len_feas=len_seq,
-            hidden_size=hidden_size,
+            hidden_size=self.hidden_size,
             name='blstm_2')
         outputs, len_seq = self.pooling(outputs, len_seq, 'SAME', 2)
 
         outputs = self.blstm(
             hidden_output=outputs,
             len_feas=len_seq,
-            hidden_size=hidden_size,
+            hidden_size=self.hidden_size,
             name='blstm_3')
         outputs, len_seq = self.pooling(outputs, len_seq, 'HALF', 3)
 
         outputs = self.blstm(
             hidden_output=outputs,
             len_feas=len_seq,
-            hidden_size=hidden_size,
+            hidden_size=self.hidden_size,
             name='blstm_4')
         outputs, len_seq = self.pooling(outputs, len_seq, 'SAME', 4)
 
         pad_mask = tf.tile(tf.sequence_mask(len_seq, tf.shape(outputs)[1], tf.float32)[:, :, None],
-                           [1, 1, hidden_size])
+                           [1, 1, self.hidden_size])
         outputs *= pad_mask
 
         return outputs, len_seq

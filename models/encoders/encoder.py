@@ -1,12 +1,11 @@
 from abc import ABCMeta, abstractmethod
 import tensorflow as tf
-from ..utils.tools import get_tensor_len
 
 
 class Encoder(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, args, training, embed_table=None, name=None):
+    def __init__(self, args, training, name=None):
         '''EDEncoder constructor
 
         Args:
@@ -17,15 +16,9 @@ class Encoder(object):
         self.args = args
         self.name = name
         self.training = training
-        self.embed_table = embed_table
-
-    def __call__(self, features, len_features):
-        outputs, len_seqs = self.encode(features, len_features)
-
-        return outputs, len_seqs
 
     @abstractmethod
-    def encode(self, features, len_features):
+    def __call__(self, features, len_features):
         '''
         Create the variables and do the forward computation
 
@@ -42,14 +35,6 @@ class Encoder(object):
             - the sequence lengths of the outputs as a dictionary of
                 [batch_size] tensors
         '''
-
-    def embedding(self, ids):
-        if self.embed_table:
-            embeded = tf.nn.embedding_lookup(self.embed_table, ids)
-        else:
-            embeded = tf.one_hot(ids, self.args.dim_output, dtype=tf.float32)
-
-        return embeded
 
     @property
     def variables(self):
