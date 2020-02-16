@@ -26,7 +26,7 @@ import tensorflow as tf
 flags = tf.flags
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("checkpoints", "",
+flags.DEFINE_string("models", "",
                     "Comma-separated list of checkpoints to average.")
 flags.DEFINE_string("prefix", "",
                     "Prefix (e.g., directory) to append to each checkpoint.")
@@ -41,7 +41,7 @@ def checkpoint_exists(path):
 
 def main(_):
   # Get the checkpoints list from flags and run some basic checks.
-  checkpoints = [c.strip() for c in FLAGS.checkpoints.split(",")]
+  checkpoints = [c.strip() for c in FLAGS.models.split(",")]
   checkpoints = [c for c in checkpoints if c]
   if not checkpoints:
     raise ValueError("No checkpoints provided for averaging.")
@@ -88,20 +88,20 @@ def main(_):
                                            six.iteritems(var_values)):
       sess.run(assign_op, {p: value})
     # Use the built saver to save the averaged checkpoint.
-    saver.save(sess, FLAGS.output_path)
+    model_avg = FLAGS.prefix + 'avg_' + FLAGS.models
+    saver.save(sess, model_avg)
     # saver.save(sess, FLAGS.output_path, global_step=global_step)
 
-  tf.logging.info("Averaged checkpoints saved in %s", FLAGS.output_path)
+  tf.logging.info("Averaged checkpoints saved in :\n%s", model_avg)
 
 
 if __name__ == "__main__":
   """
   usage:
   ```
-      CUDA_VISIBLE_DEVICES= python ~/easton/scripts/avg_checkpoints.py
-      --checkpoints 12999,13999,14999,15999
+      python ~/easton/scripts/avg_checkpoints.py
+      --models 12999,13999,14999,15999
       --prefix /mnt/lustre/xushuang/easton/projects/asr-ctc-tf/exp/hkust/models/standard2.8.1.yaml/checkpoint/model-
-      --output_path models/standard2.8.1.yaml/checkpoint/avg_12999,13999,14999,15999
   ```
   """
   tf.app.run()

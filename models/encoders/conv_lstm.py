@@ -10,7 +10,7 @@ class CONV_LSTM(Encoder):
     def __init__(self, args, training, name='conv_lstm'):
         self.hidden_size = args.model.encoder.hidden_size
         self.num_filters = args.model.encoder.num_filters
-        self.feature_map = self.args.data.num_feat_map
+        self.feature_map = args.data.num_feat_map
         super().__init__(args, training, name)
 
     def __call__(self, features, len_features):
