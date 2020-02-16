@@ -25,7 +25,7 @@ data:
     right_context: 1
     downsample: 4
     add_delta: False
-    unit: word
+    unit: char
     add_eos: True
 
 model:

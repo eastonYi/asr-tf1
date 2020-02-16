@@ -1,6 +1,5 @@
 #!/usr/bin/env
 # coding=utf-8
-import time
 from utils.arguments import args
 from models.utils.tfData import TFDataSaver
 from utils.tools import get_bucket
@@ -8,7 +7,6 @@ from utils.tools import get_bucket
 
 def main():
     # import pdb; pdb.set_trace()
-    assert args.data.add_eos == False
     # confirm = input("You are going to generate new tfdata, may covering the existing one.\n press ENTER to continue. ")
     # if confirm == "":
     #     print('will generate tfdata in 5 secs!')
@@ -21,6 +19,66 @@ def main():
     # print(args.data.dim_feature)
     # feat, label = readTFRecord(args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
 #     get_bucket(args.dirs.train.tfdata / 'feature_length.txt', args.num_batch_tokens, 180)
+
+def check():
+    import tensorflow as tf
+    from .dataset import ASR_scp_DataSet
+    from models.utils.tfData import TFDataReader
+    from utils.dataset import ASRDataLoader
+
+    dataset = ASR_scp_DataSet(
+        f_scp=args.dirs.demo.scp,
+        f_trans=args.dirs.demo.trans,
+        args=args,
+        _shuffle=False,
+        transform=False)
+    TFDataSaver(dataset, args.dirs.demo.tfdata, args, size_file=1, max_feat_len=3000).split_save()
+
+    # train
+    dataReader = TFDataReader(
+        args.dirs.demo.tfdata,
+        args=args,
+        _shuffle=True,
+        transform=True)
+    batch = dataReader.fentch_batch_bucket()
+
+    # dev
+    dataReader = TFDataReader(
+        args.dirs.demo.tfdata,
+        args=args,
+        _shuffle=False,
+        transform=True)
+    dataLoader = ASRDataLoader(
+        dataReader,
+        args,
+        dataReader.feat,
+        dataReader.label,
+        batch_size=2,
+        num_loops=1)
+
+    # test
+    dataset = ASR_scp_DataSet(
+        f_scp=args.dirs.demo.scp,
+        f_trans=args.dirs.demo.trans,
+        args=args,
+        _shuffle=False,
+        transform=True)
+
+    config = tf.ConfigProto()
+    config.allow_soft_placement = True
+    config.gpu_options.allow_growth = True
+    config.log_device_placement = False
+    with tf.train.MonitoredTrainingSession(config=config) as sess:
+        dataLoader.sess = sess
+
+        import pdb; pdb.set_trace()
+
+        batch = sess.run(batch)
+        sample_dev = next(iter(dataLoader))
+        sample = dataset[0]
+
+
+
 
 if __name__ == '__main__':
     import os

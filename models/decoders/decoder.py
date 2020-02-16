@@ -64,20 +64,6 @@ class Decoder(object):
 
         return embed_table
 
-    @abstractmethod
-    def zero_state(self, encoded_dim, batch_size):
-        '''get the decoder zero state
-
-        Args:
-            encoded_dim: the dimension of the encoded sequence as a list of
-                integers
-            batch size: the batch size as a scalar Tensor
-
-        Returns:
-            the decoder zero state as a possibly nested tupple
-                of [batch_size x ... ] tensors
-        '''
-
     @property
     def variables(self):
         '''

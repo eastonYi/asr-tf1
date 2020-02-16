@@ -27,7 +27,8 @@ class CTCModel(Seq2SeqModel):
                 global_step=self.global_step,
                 args=self.args)
 
-            with tf.variable_scope(encoder.name or 'encoder'):
+            # with tf.variable_scope(encoder.name or 'encoder'):
+            with tf.variable_scope('encoder'):
                 encoded, len_encoded = encoder(feature, len_features)
 
             with tf.variable_scope(decoder.name or 'decoder'):

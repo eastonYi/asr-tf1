@@ -3,16 +3,14 @@ import numpy as np
 import logging
 from collections import defaultdict
 from random import shuffle
-from pathlib import Path
 from abc import ABCMeta, abstractmethod
-from pypinyin import pinyin, Style
-from .dataProcess import load_vocab
 
-from .dataProcess import audio2vector, process_raw_feature, down_sample, splice
-from .tools import align2stamp, align2bound, size_bucket_to_put
+from .dataProcess import process_raw_feature
+from .tools import size_bucket_to_put
 
 logging.basicConfig(level=logging.DEBUG,format='%(levelname)s(%(filename)s:%(lineno)d): %(message)s')
 
+UNK_IDX = 1
 
 class DataSet:
     __metaclass__ = ABCMeta
@@ -40,12 +38,6 @@ class ASRDataSet(DataSet):
         self.transform = transform
         self._shuffle = _shuffle
         self.token2idx,self.idx2token = args.token2idx, args.idx2token
-        self.end_id = [args.token2idx['<eos>']] if args.data.add_eos else []
-
-    @staticmethod
-    def gen_utter_list(file):
-
-        return list(open(file).readlines())
 
     def __len__(self):
         return len(self.list_utterances)
@@ -57,36 +49,29 @@ class ASR_scp_DataSet(ASRDataSet):
         Args:
             f_scp: the scp file consists of paths to feature data
             f_trans: the scp file consists of id and trans
-            f_id2label: the normalized transcripts
         """
         from .tools import ArkReader
-        self.list_files = [f_scp]
-        super().__init__(self.list_files, args, _shuffle, transform)
+        super().__init__(f_scp, args, _shuffle, transform)
         self.reader = ArkReader(f_scp)
         self.dict_trans = self.load_trans(f_trans)
         self.list_uttids = list(self.dict_trans.keys())
 
     def __getitem__(self, idx):
         sample = {}
-
         try:
             sample['uttid'] = uttid = self.list_uttids[idx]
 
             trans = self.dict_trans[uttid]
             sample['label'] = np.array(
-                [self.token2idx.get(token, self.token2idx['<unk>'])
+                [self.token2idx.get(token, UNK_IDX)
                 for token in trans],
                 dtype=np.int32)
-            assert len(trans) > 0
 
             sample['feature'] = self.reader.read_utt_data(uttid)
             if self.transform:
                 sample['feature'] = process_raw_feature(sample['feature'], self.args)
         except KeyError:
             print('Not found {}!'.format(self.list_uttids[idx]))
-            sample = None
-        except AssertionError:
-            # print('{} label is None!'.format(self.list_uttids[idx]))
             sample = None
 
         return sample
@@ -100,12 +85,13 @@ class ASR_scp_DataSet(ASRDataSet):
 
     def load_trans(self, f_trans):
         dict_trans = {}
-        with open(f_trans, encoding='utf8') as f:
+        with open(f_trans) as f:
             for line in f:
-                line = line.strip().split()
-                uttid = line[0]
-                trans = line[1:]
-                dict_trans[uttid] = trans
+                try:
+                    uttid, trans = line.strip().split(maxsplit=1)
+                    dict_trans[uttid] = trans
+                except ValueError:
+                    pass
 
         return dict_trans
 
@@ -365,6 +351,7 @@ class DataLoader(SimpleDataLoader):
                 yield self.padding_list_seq_with_labels(*batch)
                 caches[bucket] = [[], [], 0]
                 # logging.info('empty the bucket {}'.format(bucket))
+
 
 class ASRDataLoader(DataLoader):
     def __init__(self, dataset, args, feat, label, batch_size, num_loops, num_thread=4, size_queue=2000):

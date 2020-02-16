@@ -180,7 +180,6 @@ class ArkReader(object):
         Args:
             scp_path: path to the .scp file
         '''
-
         self.scp_position = 0
         fin = open(scp_path, "r", errors='ignore')
         self.dict_scp = {}
@@ -206,7 +205,7 @@ class ArkReader(object):
         ark_read_buffer = open(self.dict_scp[uttid][0], 'rb')
         ark_read_buffer.seek(int(self.dict_scp[uttid][1]), 0)
         header = unpack('<xcccc', ark_read_buffer.read(5))
-        if header[0] != b"B":
+        if header[0] != b'B':
             print("Input .ark file is not binary")
             exit(1)
         if header == (b'B', b'C', b'M', b' '):

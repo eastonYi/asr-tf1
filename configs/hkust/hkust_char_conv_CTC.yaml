@@ -21,7 +21,7 @@ data:
     right_context: 0
     downsample: 1
     add_delta: False
-    unit: word
+    unit: char
 
 model:
     type: ctcModel

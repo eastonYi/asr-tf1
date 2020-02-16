@@ -151,9 +151,9 @@ def infer():
         training=False,
         args=args)
 
-    dataset_dev = args.dataset_test if args.dataset_test else args.dataset_dev
+    dataset_dev = args.dataset_test
 
-    saver = tf.train.Saver(max_to_keep=40)
+    saver = tf.train.Saver(max_to_keep=1)
     size_variables()
 
     config = tf.ConfigProto()
@@ -182,6 +182,7 @@ def infer():
                 list_ref_char = list(ref_txt)
                 list_res_word = res_txt.split()
                 list_ref_word = ref_txt.split()
+
                 cer_dist = ed.eval(list_res_char, list_ref_char)
                 cer_len = len(list_ref_char)
                 wer_dist = ed.eval(list_res_word, list_ref_word)
@@ -273,7 +274,7 @@ def infer_lm():
                 if wer_dist/wer_len > 0:
                     print('ref  ' , ref_txt)
                     for i, decoded, score, rerank_score in zip(range(10), beam_decoded[0][0], beam_decoded[1][0], beam_decoded[2][0]):
-                        candidate = array2text(decoded, args.data.unit, args.idx2token, min_idx=0, max_idx=args.dim_output-1)
+                        candidate = array2text(decoded, args.data.unit, args.idx2token)
                         print('res' ,i , candidate, score, rerank_score)
                         fw.write('res: {}; ref: {}\n'.format(candidate, ref_txt))
                     fw.write('id:\t{} \nres:\t{}\nref:\t{}\n\n'.format(sample['id'], res_txt, ref_txt))
