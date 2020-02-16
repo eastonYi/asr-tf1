@@ -22,9 +22,9 @@ def main():
 
 def check():
     import tensorflow as tf
-    from .dataset import ASR_scp_DataSet
+    from pathlib import Path
+    from utils.dataset import ASR_scp_DataSet, ASRDataLoader
     from models.utils.tfData import TFDataReader
-    from utils.dataset import ASRDataLoader
 
     dataset = ASR_scp_DataSet(
         f_scp=args.dirs.demo.scp,
@@ -32,7 +32,7 @@ def check():
         args=args,
         _shuffle=False,
         transform=False)
-    TFDataSaver(dataset, args.dirs.demo.tfdata, args, size_file=1, max_feat_len=3000).split_save()
+    TFDataSaver(dataset, Path(args.dirs.demo.tfdata), args, size_file=1, max_feat_len=3000).split_save()
 
     # train
     dataReader = TFDataReader(
@@ -78,10 +78,9 @@ def check():
         sample = dataset[0]
 
 
-
-
 if __name__ == '__main__':
     import os
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-    main()
+#     main()
+    check()
