@@ -16,7 +16,7 @@ dirs:
         trans: /home/easton/data/AISHELL/char/test-7k.char
         tfdata: /home/easton/data/AISHELL/char/tfdata/test-11k_phone_char
     type: scp
-    vocab: /home/easton/data/AISHELL/char/char.vocab
+    vocab: /home/easton/data/AISHELL/char/vocab.char
     # checkpoint: /home/easton/projects/asr-tf1/exps/aishell/aishell_transformer_char/120k/checkpoint/model-50399
 
 data:

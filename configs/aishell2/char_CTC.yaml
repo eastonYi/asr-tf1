@@ -1,5 +1,5 @@
 dirs:
-    exp: hkust
+    exp: aishell2
     train:
         scp: /data3/easton/data/AISHELL-2/fbank_data/train/feats.scp
         trans: /data3/easton/data/AISHELL-2/fbank_data/train/trans.char
@@ -19,8 +19,8 @@ dirs:
     text:
         data: /data3/easton/data/AISHELL-2/fbank_data/train/text.char
     type: scp
-    vocab: /data3/easton/data/AISHELL-2/fbank_data/char.vocab
-    # vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
+    vocab: /data3/easton/data/AISHELL-2/fbank_data/vocab.char
+    # vocab: /home/easton/data/CALLHOME/Mandarin//data3/easton/data/AISHELL-2/fbank_data
     # checkpoint: /data/sxu/easton/projects/EODM/exps/hksut/hkust_CTC/checkpoint
 
 data:
@@ -38,7 +38,7 @@ model:
     confidence_penalty: 0.2
     encoder:
         type: conv_lstm
-        hidden_size: 1024
+        hidden_size: 1600
         num_filters: 64
         dropout: 0.9
     decoder:

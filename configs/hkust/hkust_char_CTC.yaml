@@ -19,8 +19,8 @@ dirs:
     text:
         data: /home/easton/data/HKUST/HKUST_120/train/text.char
     type: scp
-    vocab: /home/easton/data/HKUST/HKUST_120/char.vocab
-    # vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
+    vocab: /home/easton/data/HKUST/HKUST_120/vocab.char
+    # vocab: /home/easton/data/CALLHOME/Mandarin/vocab.char
     # checkpoint: /data/sxu/easton/projects/EODM/exps/hksut/hkust_CTC/checkpoint
 
 data:
@@ -38,7 +38,7 @@ model:
     confidence_penalty: 0.2
     encoder:
         type: conv_lstm
-        hidden_size: 1024
+        hidden_size: 1600
         num_filters: 64
         dropout: 0.9
     decoder:

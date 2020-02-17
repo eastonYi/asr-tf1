@@ -23,8 +23,8 @@ class Transformer_Decoder(Decoder):
         self.size_embedding = args.model.decoder.num_cell_units
         self._ff_activation = lambda x, y: x * tf.sigmoid(y)
         self.lambda_lm = self.args.lambda_lm
-        super().__init__(args, training, global_step, name)
         self.embed_table = self.gen_embedding(self.dim_output, self.size_embedding)
+        super().__init__(args, training, global_step, name)
 
     def __call__(self, encoded, len_encoded, decoder_input):
         # used for MLE training
@@ -106,7 +106,7 @@ class Transformer_Decoder(Decoder):
         """
         batch_size = tf.shape(encoded)[0]
         token_init = tf.fill([batch_size, 1], SOS_IDX)
-        logits_init = tf.zeros([batch_size, 0, self.dim_output], dtype=tf.float32)
+        logits_init = tf.zeros([batch_size, 1, self.dim_output], dtype=tf.float32)
         finished_init = tf.zeros([batch_size], dtype=tf.bool)
         len_decoded_init = tf.ones([batch_size], dtype=tf.int32)
         cache_decoder_init = tf.zeros([batch_size, 0, self.num_blocks, self.num_cell_units])
@@ -162,7 +162,7 @@ class Transformer_Decoder(Decoder):
                               tf.TensorShape([None])]
             )
         len_decoded -= 1-tf.to_int32(finished) # for decoded length cut by encoded length
-        # logits = logits[:, 1:, :]
+        logits = logits[:, 1:, :]
         preds = preds[:, 1:]
         not_padding = tf.sequence_mask(len_decoded, dtype=tf.int32)
         preds = tf.multiply(tf.to_int32(preds), not_padding)

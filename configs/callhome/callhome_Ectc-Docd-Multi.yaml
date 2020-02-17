@@ -28,7 +28,7 @@ dirs:
         data: /home/easton/data/HKUST/HKUST_80/train/text.char
     type: scp_multi
     vocab_phone: /home/easton/data/CALLHOME/Mandarin/phones.vocab
-    vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
+    vocab: /home/easton/data/CALLHOME/Mandarin/vocab.char
     # checkpoint_G: /home/easton/projects/asr-tf1/exps/callhome/callhome_Ectc-Docd-Multi/conv-lstm_mergeTrue/checkpoint/model_G-16399
     # checkpoint_G_en: /home/easton/projects/asr-tf1/exps/callhome/callhome_Ectc-Docd-Multi/conv-lstm_mergeTrue/checkpoint/model_G-16399
 

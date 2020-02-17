@@ -219,7 +219,7 @@ class TFDataSaver:
                 dim_feature = sample['feature'].shape[-1]
                 if (num_token // self.size_file) > idx_file:
                     idx_file = num_token // self.size_file
-                    print('saving to file {}/{}.recode'.format(self.dir_save, idx_file))
+                    logging.info('saving to file {}/{}.recode'.format(self.dir_save, idx_file))
                     writer = tf.io.TFRecordWriter(str(self.dir_save/'{}.recode'.format(idx_file)))
 
                 example = tf.train.Example(
@@ -253,7 +253,7 @@ class TFDataSaver:
             idx_start = i*self.size_file
             idx_end = min((i+1)*self.size_file, len(self.dataset))
             writer = tf.io.TFRecordWriter(str(self.dir_save/'{}.recode'.format(i)))
-            print('saving dataset[{}: {}] to file {}/{}.recode'.format(idx_start, idx_end, self.dir_save, i))
+            logging.info('saving dataset[{}: {}] to file {}/{}.recode'.format(idx_start, idx_end, self.dir_save, i))
 
             with open(self.dir_save/'feature_length.{}.txt'.format(i), 'w') as fw:
                 if i == 0:
@@ -284,12 +284,12 @@ class TFDataSaver:
                     num_saved += 1
                     # if num_saved % 2000 == 0:
                     #     print('saved {} samples in {}.recode'.format(num_saved, i))
-            print('{}.recoder finished, {} saved, {} damaged. '.format(i, num_saved, num_damaged_sample))
+            logging.info('{}.recoder finished, {} saved, {} damaged. '.format(i, num_saved, num_damaged_sample))
             output.put((i, num_damaged_sample, num_saved))
 
         processes = []
         workers = len(self.dataset)//self.size_file + 1
-        print('save {} samples to {} recoder files'.format(len(self.dataset), workers))
+        logging.info('save {} samples to {} recoder files'.format(len(self.dataset), workers))
         for i in range(workers):
             p = Process(target=gen_recoder, args=(i, ))
             p.start()

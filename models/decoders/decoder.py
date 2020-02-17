@@ -52,7 +52,7 @@ class Decoder(object):
         if embed_table is not None:
             embeded = tf.nn.embedding_lookup(embed_table, ids)
         else:
-            embeded = tf.one_hot(ids, self.args.dim_output, dtype=tf.float32)
+            embeded = tf.one_hot(ids, self.dim_output, dtype=tf.float32)
 
         return embeded
 

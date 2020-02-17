@@ -16,7 +16,7 @@ dirs:
         trans: /home/easton/data/CALLHOME/Mandarin/test_dim80/test.char
         tfdata: /home/easton/data/CALLHOME/Mandarin/tfdata/test_char
     type: scp
-    vocab: /home/easton/data/CALLHOME/Mandarin/char.vocab
+    vocab: /home/easton/data/CALLHOME/Mandarin/vocab.char
     # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc2/1k/checkpoint/model-599
     # checkpoint: /mnt/lustre/xushuang2/easton/projects/asr-tf1/exps/aishell/aishell_ctc2/Ectc_Docd/checkpoint/model-10799
 

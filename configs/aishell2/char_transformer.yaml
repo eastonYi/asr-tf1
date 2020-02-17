@@ -1,5 +1,5 @@
 dirs:
-    exp: hkust
+    exp: aishell2
     train:
         scp: /home/easton/data/HKUST/HKUST_120/train/feats.scp
         trans: /home/easton/data/HKUST/HKUST_120/train/trans.char
@@ -19,8 +19,8 @@ dirs:
     text:
         data: /home/easton/data/HKUST/HKUST_120/train/text.char
     type: scp
-    # vocab: /home/easton/data/HKUST/HKUST_120/char.vocab
-    vocab: /home/easton/data/HKUST/HKUST_120/char.vocab
+    # vocab: /home/easton/data/HKUST/HKUST_120/vocab.char
+    vocab: /home/easton/data/HKUST/HKUST_120/vocab.char
     # checkpoint: /data/sxu/easton/projects/EODM/exps/hksut/hkust_CTC/checkpoint
 
 data:

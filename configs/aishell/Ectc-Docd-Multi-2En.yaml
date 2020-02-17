@@ -24,7 +24,7 @@ dirs:
         data: /home/easton/data/AISHELL/char/text.char
     type: scp_multi
     vocab_phone: /home/easton/data/AISHELL/phone/phones.vocab
-    vocab: /home/easton/data/AISHELL/char/char.vocab
+    vocab: /home/easton/data/AISHELL/char/vocab.char
     checkpoint_G: /home/easton/projects/asr-tf1/exps/aishell/Ectc-Docd-Multi-2En/10k_conv-lstm-256_fc/checkpoint/model_G-5399
 
 data:

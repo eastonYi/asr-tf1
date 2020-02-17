@@ -5,8 +5,8 @@ from ..utils.attention import residual, multihead_attention, ff_hidden,\
 
 
 class Transformer_Encoder(Encoder):
-    def __init__(self, args, training, embed_table=None, name=None):
-        super().__init__(args, training, embed_table=None, name=None)
+    def __init__(self, args, training, name=None):
+        super().__init__(args, training, name=None)
         self.attention_dropout_rate = args.model.encoder.attention_dropout_rate if training else 0.0
         self.residual_dropout_rate = args.model.encoder.residual_dropout_rate if training else 0.0
         self.hidden_units = args.model.encoder.num_cell_units
@@ -14,7 +14,7 @@ class Transformer_Encoder(Encoder):
         self.num_blocks = args.model.encoder.num_blocks
         self._ff_activation = lambda x, y: x * tf.sigmoid(y)
 
-    def encode(self, features, len_features):
+    def __call__(self, features, len_features):
 
         encoder_output = tf.layers.dense(
             inputs=features,

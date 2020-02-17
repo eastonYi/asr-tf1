@@ -19,7 +19,7 @@ dirs:
         # trans: /home/easton/data/AISHELL/char/train-120k.char
         # tfdata: /home/easton/data/AISHELL/char/tfdata/train-char-120k
     type: scp
-    vocab: /home/easton/data/AISHELL/char/char.vocab
+    vocab: /home/easton/data/AISHELL/char/vocab.char
     # checkpoint: /home/easton/projects/asr-tf1/exps/aishell/aishell_transformer_char/checkpoint/model-59099
 
 data:
