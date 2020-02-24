@@ -173,7 +173,7 @@ class Conv_Transformer_Encoder(Transformer_Encoder):
         x = tf.reshape(x, [size_batch, size_length, size_feat])
 
         encoder_output = tf.layers.dense(
-            inputs=features,
+            inputs=x,
             units=self.hidden_units,
             activation=None,
             use_bias=False,
@@ -219,7 +219,7 @@ class Conv_Transformer_Encoder(Transformer_Encoder):
                                           dropout_rate=self.residual_dropout_rate)
 
                 if i == self.num_blocks // 2:
-                    encoder_output = tf.layers.max_pooling2d(encoder_output, (2, 1), (2, 1), 'SAME')
+                    encoder_output = tf.layers.max_pooling1d(encoder_output, 2, 2, 'SAME')
                     len_seq = tf.cast(tf.math.ceil(tf.cast(len_seq, tf.float32)/2), tf.int32)
         # Mask padding part to zeros.
         encoder_output *= tf.expand_dims(1.0 - tf.to_float(encoder_padding), axis=-1)
