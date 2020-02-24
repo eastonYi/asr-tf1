@@ -142,6 +142,8 @@ except:
 ## encoder
 if args.model.encoder.type == 'transformer_encoder':
     from models.encoders.transformer_encoder import Transformer_Encoder as encoder
+elif args.model.decoder.type == 'conv_transformer_encoder':
+    from models.decoders.transformer_encoder import Conv_Transformer_Encoder as encoder
 elif args.model.encoder.type == 'conv_lstm':
     from models.encoders.conv_lstm import CONV_LSTM as encoder
 elif args.model.encoder.type == 'blstm':
@@ -161,8 +163,6 @@ elif args.model.decoder.type == 'conv_decoder':
     from models.decoders.conv_decoder import CONV_Decoder as decoder
 elif args.model.decoder.type == 'transformer_decoder':
     from models.decoders.transformer_decoder import Transformer_Decoder as decoder
-elif args.model.decoder.type == 'Conv_Transformer_Encoder':
-    from models.decoders.transformer_decoder import Conv_Transformer_Encoder as decoder
 else:
     raise NotImplementedError('not found decoder type: {}'.format(args.model.decoder.type))
 args.model.decoder.type = decoder
