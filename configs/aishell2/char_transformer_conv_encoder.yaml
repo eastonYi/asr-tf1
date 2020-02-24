@@ -1,0 +1,80 @@
+dirs:
+    exp: aishell2
+    train:
+        scp: /data3/easton/data/AISHELL-2/org_data/train/feats.scp
+        trans: /data3/easton/data/AISHELL-2/org_data/train/trans.char
+        tfdata: /data3/easton/data/AISHELL-2/tfdata/train_char
+    dev:
+        scp: /data3/easton/data/AISHELL-2/org_data/dev/feats.scp
+        trans: /data3/easton/data/AISHELL-2/org_data/dev/trans.char
+        tfdata: /data3/easton/data/AISHELL-2/tfdata/dev_char
+    test:
+        scp: /data3/easton/data/AISHELL-2/org_data/eval/feats.scp
+        trans: /data3/easton/data/AISHELL-2/org_data/eval/trans.char
+        tfdata: /data3/easton/data/AISHELL-2/tfdata/eval_char
+    text:
+        data: /home/easton/data/HKUST/HKUST_120/train/text.char
+    type: scp
+    vocab:
+    vocab: /data3/easton/data/AISHELL-2/vocab.char
+    # vocab: /home/easton/data/HKUST/HKUST_120/vocab.char
+    # checkpoint: /data/sxu/easton/projects/EODM/exps/hksut/hkust_CTC/checkpoint
+
+data:
+    featType: mfcc
+    left_context: 0
+    right_context: 0
+    downsample: 1
+    add_delta: False
+    unit: word
+    add_eos: True
+
+model:
+    type: transformer
+    encoder:
+        type: conv_transformer_encoder
+        num_blocks: 6
+        num_heads: 4
+        num_cell_units: 512
+        attention_dropout_rate: 0.1
+        residual_dropout_rate: 0.1
+    decoder:
+        type: transformer_decoder
+        size_embedding: 512
+        num_blocks: 4
+        num_heads: 4
+        num_cell_units: 512
+        attention_dropout_rate: 0.1
+        residual_dropout_rate: 0.1
+        init_scale: 0.04
+        label_smoothing: 0.98
+        max_decode_len: 30
+
+opti:
+    type: adam
+    lr: 0.0004
+
+dev_step: 200
+decode_step: 200
+save_step: 200
+num_epochs: 999
+sample_uttid: IT0011W0013
+
+optimizer: adam
+warmup_steps: 6000
+peak: 0.0002
+decay_steps: 8000
+
+gpus: '0'
+batch_size: 60
+text_batch_size: 200
+beam_size: 1
+num_batch_tokens: 20000
+bucket_boundaries: 172,231,278,321,364,407,457,518,604,766,2083
+seed: 8
+
+lambda_l2: 0.0
+grad_clip_value: 0.0
+slot_clip_value: 0.0
+grad_clip_norm: 0.0
+grad_clip_global_norm: 0.0
