@@ -90,11 +90,11 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
     import sys
 
-    overrite = sys.argv[-3]
-    if overrite == '1':
-        overrite = True
+    overwrite = sys.argv[-3]
+    if overwrite == '1':
+        overwrite = True
     else:
-        overrite = False
+        overwrite = False
 
-    main(overrite=overrite)
+    main(overwrite=overwrite)
 #     check()
