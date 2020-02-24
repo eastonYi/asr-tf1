@@ -13,7 +13,7 @@ dirs:
         trans: /data3/easton/data/AISHELL-2/org_data/eval/trans.char
         tfdata: /data3/easton/data/AISHELL-2/tfdata/eval_char
     text:
-        data: /home/easton/data/HKUST/HKUST_120/train/text.char
+        data: /data3/easton/data/AISHELL-2/org_data/eval/trans.char
     type: scp
     vocab:
     vocab: /data3/easton/data/AISHELL-2/vocab.char
@@ -27,12 +27,14 @@ data:
     downsample: 1
     add_delta: False
     unit: word
+    num_feat_map: 3
     add_eos: True
 
 model:
     type: transformer
     encoder:
         type: conv_transformer_encoder
+        num_filters: 64
         num_blocks: 6
         num_heads: 4
         num_cell_units: 512
@@ -54,16 +56,16 @@ opti:
     type: adam
     lr: 0.0004
 
-dev_step: 200
-decode_step: 200
-save_step: 200
+dev_step: 500
+decode_step: 500
+save_step: 500
 num_epochs: 999
 sample_uttid: IT0011W0013
 
 optimizer: adam
-warmup_steps: 6000
-peak: 0.0002
-decay_steps: 8000
+warmup_steps: 10000
+peak: 0.001
+decay_steps: 12000
 
 gpus: '0'
 batch_size: 60
