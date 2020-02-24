@@ -30,7 +30,7 @@ data:
     downsample: 1
     add_delta: False
     num_feat_map: 3
-    unit: char
+    unit: word
     add_eos: False
 
 model:

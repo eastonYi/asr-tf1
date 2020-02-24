@@ -161,6 +161,8 @@ elif args.model.decoder.type == 'conv_decoder':
     from models.decoders.conv_decoder import CONV_Decoder as decoder
 elif args.model.decoder.type == 'transformer_decoder':
     from models.decoders.transformer_decoder import Transformer_Decoder as decoder
+elif args.model.decoder.type == 'Conv_Transformer_Encoder':
+    from models.decoders.transformer_decoder import Conv_Transformer_Encoder as decoder
 else:
     raise NotImplementedError('not found decoder type: {}'.format(args.model.decoder.type))
 args.model.decoder.type = decoder
@@ -180,8 +182,6 @@ elif args.model.type == 'Ectc_Docd_Multi_2En':
         from models.encoders.conv_lstm import CONV_LSTM as encoder
     elif args.model.encoder2.type == 'conv_lstm_4x':
         from models.encoders.conv_lstm import CONV_LSTM_4x as encoder
-    elif args.model.encoder2.type == 'classifier':
-        from models.encoders.classifier import CONV_LSTM_Classifier as encoder
     elif args.model.encoder2.type == 'blstm':
         from models.encoders.blstm import BLSTM as encoder
     elif args.model.encoder2.type == 'conv_1d':
