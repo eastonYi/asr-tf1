@@ -90,7 +90,7 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
     import sys
 
-    overrite = sys.argv[-1]
+    overrite = sys.argv[-3]
     if overrite == '1':
         overrite = True
     else:
