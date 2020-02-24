@@ -226,7 +226,7 @@ class Conv_Transformer_Encoder(Transformer_Encoder):
 
         return encoder_output, len_features
 
-    def normal_conv(inputs, filter_num, kernel, stride, padding, use_relu, name, norm_type="batch"):
+    def normal_conv(self, inputs, filter_num, kernel, stride, padding, use_relu, name, norm_type="batch"):
         with tf.variable_scope(name):
             net = tf.layers.conv2d(inputs, filter_num, kernel, stride, padding, name="conv")
             if norm_type == "batch":
