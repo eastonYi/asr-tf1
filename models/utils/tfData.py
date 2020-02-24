@@ -195,7 +195,7 @@ class TFDataSaver:
     """
     test on TF2.0-alpha
     """
-    def __init__(self, dataset, dir_save, args, size_file=5000000, max_feat_len=3000):
+    def __init__(self, dataset, dir_save, args, overwrite=False, size_file=5000000, max_feat_len=3000):
         self.dataset = dataset
         self.max_feat_len = max_feat_len
         self.dir_save = dir_save
@@ -204,8 +204,12 @@ class TFDataSaver:
         self.save_multilabel = args.dirs.vocab_phone
         self.size_file = size_file
         self.dim_feature = dataset[0]['feature'].shape[-1]
+        self.overwrite = overwrite
 
     def save(self):
+        if not self.overwrite:
+            raise Exception('You are trying to overrite the tf data!')
+
         num_token = 0
         idx_file = -1
         num_damaged_sample = 0
@@ -243,6 +247,9 @@ class TFDataSaver:
         return
 
     def split_save(self):
+
+        if not self.overwrite:
+            raise Exception('You are trying to overrite the tf data!')
         output = Queue()
         coord = tf.train.Coordinator()
         assert self.dataset.transform == False

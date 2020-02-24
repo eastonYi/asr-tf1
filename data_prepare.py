@@ -5,7 +5,7 @@ from models.utils.tfData import TFDataSaver
 from utils.tools import get_bucket
 
 
-def main():
+def main(overwrite=False):
     # import pdb; pdb.set_trace()
     # confirm = input("You are going to generate new tfdata, may covering the existing one.\n press ENTER to continue. ")
     # if confirm == "":
@@ -13,9 +13,8 @@ def main():
     #     time.sleep(5)
     # save2tfrecord_multilabel(args.dataset_train, args.dirs.train.tfdata, size_file=10000000)
     #save2tfrecord_multilabel(args.dataset_untrain, args.dirs.untrain.tfdata, size_file=10000000)
-
-    TFDataSaver(args.dataset_train, args.dirs.train.tfdata, args, size_file=30000, max_feat_len=3000).split_save()
-    TFDataSaver(args.dataset_dev, args.dirs.dev.tfdata, args, size_file=10000, max_feat_len=3000).split_save()
+    TFDataSaver(args.dataset_train, args.dirs.train.tfdata, args, overwrite, size_file=30000, max_feat_len=3000).split_save()
+    TFDataSaver(args.dataset_dev, args.dirs.dev.tfdata, args, overwrite, size_file=10000, max_feat_len=3000).split_save()
     # print(args.data.dim_feature)
     # feat, label = readTFRecord(args.dirs.dev.tfdata, args, _shuffle=False, transform=True)
     get_bucket(args.dirs.train.tfdata / 'feature_length.txt', args.num_batch_tokens, 180)
@@ -89,6 +88,13 @@ def check():
 if __name__ == '__main__':
     import os
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    import sys
 
-    main()
+    overrite = sys.argv[-1]
+    if overrite == '1':
+        overrite = True
+    else:
+        overrite = False
+
+    main(overrite=overrite)
 #     check()
