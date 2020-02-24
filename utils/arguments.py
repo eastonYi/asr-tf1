@@ -143,7 +143,7 @@ except:
 if args.model.encoder.type == 'transformer_encoder':
     from models.encoders.transformer_encoder import Transformer_Encoder as encoder
 elif args.model.encoder.type == 'conv_transformer_encoder':
-    from models.decoders.transformer_encoder import Conv_Transformer_Encoder as encoder
+    from models.encoder.transformer_encoder import Conv_Transformer_Encoder as encoder
 elif args.model.encoder.type == 'conv_lstm':
     from models.encoders.conv_lstm import CONV_LSTM as encoder
 elif args.model.encoder.type == 'blstm':
