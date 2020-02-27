@@ -168,8 +168,8 @@ class Conv_Transformer_Encoder(Transformer_Encoder):
             filters=self.num_filters)
 
         size_feat = int(np.ceil(size_feat/2)) * self.num_filters
-        size_length = tf.cast(tf.math.ceil(tf.cast(size_length, tf.float32)/2), tf.int32)
-        len_seq = tf.cast(tf.math.ceil(tf.cast(len_features, tf.float32)/2), tf.int32)
+        size_length = tf.cast(tf.math.ceil(tf.cast(size_length, tf.float32)/4), tf.int32)
+        len_seq = tf.cast(tf.math.ceil(tf.cast(len_features, tf.float32)/4), tf.int32)
         x = tf.reshape(x, [size_batch, size_length, size_feat])
 
         encoder_output = tf.layers.dense(
@@ -188,7 +188,7 @@ class Conv_Transformer_Encoder(Transformer_Encoder):
                                            rate=self.residual_dropout_rate,
                                            training=self.training)
         # Mask
-        encoder_padding = tf.equal(tf.sequence_mask(len_features, maxlen=tf.shape(features)[1]), False) # bool tensor
+        encoder_padding = tf.equal(tf.sequence_mask(len_seq, maxlen=size_length), False) # bool tensor
         encoder_attention_bias = attention_bias_ignore_padding(encoder_padding)
 
         # Blocks
@@ -218,13 +218,18 @@ class Conv_Transformer_Encoder(Transformer_Encoder):
                                               activation=self._ff_activation),
                                           dropout_rate=self.residual_dropout_rate)
 
-                if i == self.num_blocks // 2:
+                if i in (2, 4):
                     encoder_output = tf.layers.max_pooling1d(encoder_output, 2, 2, 'SAME')
+
+                    size_length = tf.cast(tf.math.ceil(tf.cast(size_length, tf.float32)/2), tf.int32)
                     len_seq = tf.cast(tf.math.ceil(tf.cast(len_seq, tf.float32)/2), tf.int32)
+                    encoder_padding = tf.equal(tf.sequence_mask(len_seq, maxlen=size_length), False) # bool tensor
+                    encoder_attention_bias = attention_bias_ignore_padding(encoder_padding)
+
         # Mask padding part to zeros.
         encoder_output *= tf.expand_dims(1.0 - tf.to_float(encoder_padding), axis=-1)
 
-        return encoder_output, len_features
+        return encoder_output, len_seq
 
     def normal_conv(self, inputs, filter_num, kernel, stride, padding, use_relu, name, norm_type="batch"):
         with tf.variable_scope(name):

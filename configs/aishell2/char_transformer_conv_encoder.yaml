@@ -28,10 +28,10 @@ data:
     add_delta: False
     unit: word
     num_feat_map: 3
-    add_eos: True
+    add_eos: False
 
 model:
-    type: transformer
+    type: ctcModel
     encoder:
         type: conv_transformer_encoder
         num_filters: 64
@@ -41,16 +41,8 @@ model:
         attention_dropout_rate: 0.1
         residual_dropout_rate: 0.1
     decoder:
-        type: transformer_decoder
-        size_embedding: 512
-        num_blocks: 4
-        num_heads: 4
-        num_cell_units: 512
-        attention_dropout_rate: 0.1
-        residual_dropout_rate: 0.1
-        init_scale: 0.04
-        label_smoothing: 0.98
-        max_decode_len: 30
+        type: FC
+        num_fc: 0
 
 opti:
     type: adam

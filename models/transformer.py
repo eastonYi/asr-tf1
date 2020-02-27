@@ -13,6 +13,7 @@ import logging
 from .seq2seqModel import Seq2SeqModel, SOS_IDX
 from .utils.tools import right_shift_rows
 
+
 class Transformer(Seq2SeqModel):
     '''a general class for an encoder decoder system
     '''

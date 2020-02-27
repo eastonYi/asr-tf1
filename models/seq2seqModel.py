@@ -252,59 +252,6 @@ class Seq2SeqModel(object):
                                                               name=self.args.optimizer)
         return optimizer
 
-    def schedule_sampling(self, encoder_output, Y):
-        # Prepare beam search inputs.
-        batch_size = tf.shape(encoder_output)[0]
-        preds = tf.ones([batch_size, 1], dtype=tf.int32) * self.args.sis_idx
-        # [batch_size, step=0, dst_vocab_size]
-        logits = tf.zeros([batch_size, 0, self.args.dim_output])
-        y_max_length = tf.shape(Y)[1]
-
-        def not_finished(i, preds, logits):
-            return tf.less(i, y_max_length)
-
-        def step(i, preds, logits):
-            last_logit = self.decoder(preds, encoder_output, reuse=True)
-            # 采样概率正确值或者推理值, 第一个是teacher_force概率，第二个是inference概率, 这里只选一个值
-            schedule_sampling_epsilon = tf.constant([[self.args.schedule_sampling_epsilon, 1 - self.args.schedule_sampling_epsilon]],
-                dtype=tf.float32)
-            # tf.multinomial()按照该概率分布进行采样, 返回值第一维是batch_size, 第二维是logits第二维上的id
-            # 即返回0表示选择teacher_force，反之为inference，返回的shape为(1,1)
-            sampling_result = tf.to_int32(
-                tf.multinomial(tf.log(schedule_sampling_epsilon), num_samples=1, seed=None, name=None))
-
-            def teacher_force():
-                return Y[:, i]
-
-            def sampling_inference():
-                z = tf.nn.log_softmax(last_logit)
-                # tf.multinomial()按照该概率分布进行采样, 返回值第一维是batch_size, 第二维是logits第二维上的id
-                last_preds = tf.to_int32(tf.multinomial(z, num_samples=1, seed=None, name=None))
-                return last_preds
-
-            # 默认选择常值idx=0
-            teacher_force_constant = tf.constant([[0]], dtype=tf.int32)
-            # tf.equal对输入的sampler_result和one_constant逐元素做逻辑比较，返回bool类型的 Tensor,支持broadcasting
-            # 这里的tf.equal(sampler_result, one_constant)结果的shape=(1,1)，例如：[[True]]
-            last_preds = tf.cond(tf.equal(sampling_result, teacher_force_constant)[0][0], teacher_force,
-                                 sampling_inference)
-
-            preds = tf.concat((preds, last_preds), axis=1)  # [batch_size, step=i]
-            logits = tf.concat((logits, last_logit[:, None, :]), axis=1)  # [batch_size, step=i, dst_vocab_size]
-
-            return i+1, preds, logits
-
-        i, preds, logits = tf.while_loop(cond=not_finished,
-                                         body=step,
-                                         loop_vars=[0, preds, logits],
-                                         shape_invariants=[
-                                             tf.TensorShape([]),
-                                             tf.TensorShape([None, None]),
-                                             tf.TensorShape([None, None, None])])
-
-        preds = preds[:, 1:]  # remove <S> flag
-        return preds, logits
-
     def trainable_variables(self, scope=None):
         '''
             get a list of the models's variables
